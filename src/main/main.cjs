@@ -1319,13 +1319,12 @@ async function runSelftest() {
           : `${id}: (missing)`
       }
       /*
-       * `applied()` is what the self-test normally asserts on, but it does not
-       * track a *forced* modelParams value: it reports 0 even while the render
-       * clearly shows the mouth closed/open (compare selftest-mouth-0/1.png).
-       * So print it as a hint, and judge this probe on the screenshots.
+       * `applied()` reflects the model this frame; a forced modelParams value
+       * reads back inconsistently (0 on some runs, the forced value on others),
+       * so treat it as a hint and judge this probe on the screenshot.
        */
       console.log(
-        `[selftest] mouth fixed=${value} -> 渲染已按该值重绘（看 selftest-mouth-${value}.png）；applied 回读=${a?.mouthOpenY}（强制值不回读，属已知报告问题）`
+        `[selftest] mouth fixed=${value} -> applied 回读=${a?.mouthOpenY}（该值偶发不回读，以 selftest-mouth-${value}.png 的渲染为准）`
       )
       for (const id of [
         'ArtMeshFace',
