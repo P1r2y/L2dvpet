@@ -103,6 +103,7 @@ export class Pet {
     this.settings = settings
     const s = settings
     this.gaze.applySettings(s.gaze)
+    this.gaze.setPettingFollow(s.petting?.headFollow)
     this.blink.applySettings(s.idle)
     this.motions.applySettings(s.idle)
 
@@ -190,7 +191,10 @@ export class Pet {
     })
 
     /* blink ----------------------------------------------------------- */
-    const blinkScale = this.petting ? 0.58 : 1
+    // 舒服地眯眼 (设置 → 抚摸): the steady half-close that lasts as long as the
+    // stroking does. Off means the eyes stay open throughout.
+    const squintOn = this.settings?.petting?.squint !== false
+    const blinkScale = this.petting && squintOn ? 0.58 : 1
     this.blink.scale += (blinkScale - this.blink.scale) * smoothFactor(0.2, dt)
     this.blinkValue = this.blink.update(dt)
 
@@ -336,7 +340,7 @@ export class Pet {
         bodyX: this.stage.getParam(core, P.bodyX),
       }
     }
-    const open = clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
+    const open = this.eyeFactor
     for (const id of [P.eyeLOpen, P.eyeROpen]) {
       /*
        * Runs immediately after the motion manager, which is the only moment the
@@ -352,6 +356,19 @@ export class Pet {
     this._writeEyeOpen(core, P.eyeLOpen, open)
     this._writeEyeOpen(core, P.eyeROpen, open)
     this._applyManual(core, 'early')
+  }
+
+  /**
+   * The app's own eye-open factor: the blink curve times the current
+   * expression's squint.
+   *
+   * While the pet is being stroked, 设置 → 抚摸 → 舒服地眯眼 is authoritative:
+   * with it off the eyes stay open whatever wants to narrow them — our blink
+   * curve, the stroking squint, or the expression a pet reaction sets.
+   */
+  get eyeFactor() {
+    if (this.petting && this.settings?.petting?.squint === false) return 1
+    return clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
   }
 
   /**
@@ -413,7 +430,7 @@ export class Pet {
     /* ---- re-assert the blink after eye-blink/focus.
            ParamEyeBallForm is deliberately NOT written: psd2live's
            PhysicsEyeJelly owns it (driven by ParamEyeL/ROpen, scale 0.32). ---- */
-    const open = clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
+    const open = this.eyeFactor
     this._writeEyeOpen(core, P.eyeLOpen, open)
     this._writeEyeOpen(core, P.eyeROpen, open)
 
@@ -433,7 +450,10 @@ export class Pet {
       const speed = clamp(Number(cfg?.idle?.breathSpeed) || 1, 0.1, 4)
       // One breath cycle ≈ 3.4 s at speed 1 — a calm resting rate.
       this.breathPhase = (this.breathPhase + this._lastDt * speed * 1.85) % (Math.PI * 2)
-      st.setParam(core, P.breath, 0.5 - 0.5 * Math.cos(this.breathPhase))
+      const amount = clamp(Number(cfg?.idle?.breathAmount ?? 1), 0, 1)
+      // Amplitude scales the swing around the resting midpoint, so 0 % holds a
+      // still chest and 100 % keeps the authored 0↔1 range.
+      st.setParam(core, P.breath, 0.5 - amount * 0.5 * Math.cos(this.breathPhase))
     }
 
     /* ---- manual overrides win over everything above ---- */

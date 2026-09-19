@@ -63,6 +63,8 @@ export class GazeController {
     this.overrideUntil = 0
     /** While true, gaze relaxes to centre (e.g. while being petted). */
     this.suppressed = false
+    /** 抚摸时头部跟随鼠标的强度, 0..1 (设置 → 抚摸 → 头部跟随鼠标). */
+    this.pettingFollow = 0
     this.output = { eyeX: 0, eyeY: 0, headX: 0, headY: 0, headZ: 0, bodyX: 0, bodyY: 0 }
   }
 
@@ -78,6 +80,16 @@ export class GazeController {
 
   suppress(on) {
     this.suppressed = !!on
+  }
+
+  /**
+   * While the pet is being stroked the eyes stop tracking — darting pupils with
+   * a hand on her head read as broken — but the head keeps following the cursor
+   * at this strength (设置 → 抚摸 → 头部跟随鼠标). 0 keeps the old behaviour of
+   * a fully parked head.
+   */
+  setPettingFollow(amount) {
+    this.pettingFollow = clamp(Number(amount) ?? 0, 0, 1)
   }
 
   /**
@@ -100,7 +112,7 @@ export class GazeController {
     if (this.override && now < this.overrideUntil) {
       tx = this.override.x
       ty = this.override.y
-    } else if (pointer && cfg.enabled && !this.suppressed) {
+    } else if (pointer && cfg.enabled && (!this.suppressed || this.pettingFollow > 0)) {
       const dx = pointer.x - ctx.origin.x
       const dy = pointer.y - ctx.origin.y
       const ref = Math.max(ctx.screen.height * 0.55, 260)
@@ -120,7 +132,6 @@ export class GazeController {
       }
     }
     if (this.override && now >= this.overrideUntil) this.override = null
-    if (this.suppressed) falloff *= 0.25
 
     if (cfg.invertX) tx = -tx
     if (cfg.invertY) ty = -ty
@@ -180,6 +191,22 @@ export class GazeController {
     const bodyMax = Number(cfg.bodyMax) || 5
     out.bodyX = clamp(x * (Number(cfg.bodyAmount) ?? 0.2) * bodyMax, -bodyMax, bodyMax)
     out.bodyY = clamp(y * (Number(cfg.bodyAmount) ?? 0.2) * bodyMax * 0.5, -bodyMax, bodyMax)
+
+    /*
+     * 抚摸中：眼睛停住，头与身体按「头部跟随鼠标」轻微跟随。Scaling the finished
+     * output keeps the follow proportional to whatever the gaze settings already
+     * produce, so no second set of amounts has to be kept in sync.
+     */
+    if (this.suppressed) {
+      const f = this.pettingFollow
+      out.eyeX = 0
+      out.eyeY = 0
+      out.headX *= f
+      out.headY *= f
+      out.headZ *= f
+      out.bodyX *= f
+      out.bodyY *= f
+    }
     return out
   }
 }

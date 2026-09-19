@@ -49,6 +49,7 @@
     "doubleBlinkChance": 0.22,
     "breath": true,
     "breathSpeed": 1,
+    "breathAmount": 1,
     "physics": true,
     "motionsEnabled": true,
     "autoMotion": true,
@@ -62,6 +63,8 @@
     "hearts": true,
     "heartRate": 1,
     "squint": true,
+    "headFollow": 0.35,
+    "sound": true,
     "reactions": true,
     "speakLines": true,
     "reactLines": [

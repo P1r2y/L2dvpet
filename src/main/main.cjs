@@ -1510,6 +1510,104 @@ async function runSelftest() {
     )
   }
 
+  /*
+   * 本轮新增 / 修复的设置，逐条验证「确有作用」。
+   *
+   * 静态审计只能证明设置被读到 —— petting.squint 就是被读了（main.js 里读它去
+   * 触发一次 happy 反应），但真正的持续眯眼是硬编码的 0.58，设置根本没接上去。
+   * 所以这几条一律看可观测的行为差异，不看代码里有没有出现这个名字。
+   */
+  {
+    const orig = await wc.executeJavaScript(`window.__petTest.settings()`, true).catch(() => null)
+
+    /* 舒服地眯眼：开 → 眼睛被压下去；关 → 全程睁着 */
+    const eyeMinWhilePetting = async (squint) => {
+      await wc.executeJavaScript(
+        `window.__petTest.setSettings({ petting: { squint: ${squint}, sound: false, hearts: false, reactions: false, speakLines: false } })`,
+        true
+      )
+      await wc.executeJavaScript(`window.__petTest.petVisual(true, true)`, true)
+      await new Promise((r) => setTimeout(r, 600))
+      let m = 1
+      for (let i = 0; i < 14; i++) {
+        const st = await params()
+        if (st) m = Math.min(m, st.eyeLOpen)
+        await new Promise((r) => setTimeout(r, 60))
+      }
+      await wc.executeJavaScript(`window.__petTest.petVisual(false, true)`, true)
+      await new Promise((r) => setTimeout(r, 350))
+      return m
+    }
+    const eyeOn = await eyeMinWhilePetting(true)
+    const eyeOff = await eyeMinWhilePetting(false)
+    console.log(
+      `[selftest] 抚摸·眯眼 ${eyeOn < 0.75 && eyeOff > 0.9 ? 'PASS' : 'FAIL'} — 开时睁眼最低=${eyeOn.toFixed(3)}（应 <0.75），关时=${eyeOff.toFixed(3)}（应 >0.9）`
+    )
+
+    /* 头部跟随鼠标：抚摸中头仍随光标摆动，0 则完全停住 */
+    const headSpanWhilePetting = async (follow) => {
+      await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { squint: false, headFollow: ${follow} } })`, true)
+      await wc.executeJavaScript(`window.__petTest.petVisual(true, true)`, true)
+      await new Promise((r) => setTimeout(r, 300))
+      let lo = Infinity
+      let hi = -Infinity
+      for (const [x, y] of [
+        [120, 200],
+        [1900, 900],
+        [120, 200],
+        [1900, 900],
+      ]) {
+        await wc.executeJavaScript(`window.__petTest.setPointer(${x}, ${y})`, true)
+        await new Promise((r) => setTimeout(r, 420))
+        const st = await params()
+        if (st) {
+          lo = Math.min(lo, st.angleX)
+          hi = Math.max(hi, st.angleX)
+        }
+      }
+      await wc.executeJavaScript(`window.__petTest.setPointer(null, null)`, true).catch(() => {})
+      await wc.executeJavaScript(`window.__petTest.petVisual(false, true)`, true)
+      await new Promise((r) => setTimeout(r, 350))
+      return hi - lo
+    }
+    const spanFollow = await headSpanWhilePetting(1)
+    const spanParked = await headSpanWhilePetting(0)
+    console.log(
+      `[selftest] 抚摸·头部跟随 ${spanFollow > spanParked + 2 ? 'PASS' : 'FAIL'} — 跟随 100% 时 AngleX 摆幅 ${spanFollow.toFixed(2)}°，0% 时 ${spanParked.toFixed(2)}°`
+    )
+
+    /* 呼吸幅度：0% 时 ParamBreath 必须恒定 */
+    await wc.executeJavaScript(`window.__petTest.setSettings({ idle: { breath: true, breathAmount: 0 } })`, true)
+    await new Promise((r) => setTimeout(r, 400))
+    let bLo = Infinity
+    let bHi = -Infinity
+    for (let i = 0; i < 40; i++) {
+      const st = await params()
+      if (st) {
+        bLo = Math.min(bLo, st.breath)
+        bHi = Math.max(bHi, st.breath)
+      }
+      await new Promise((r) => setTimeout(r, 60))
+    }
+    console.log(`[selftest] 呼吸幅度 ${bHi - bLo < 0.02 ? 'PASS' : 'FAIL'} — 幅度 0% 时 ParamBreath 摆幅 ${(bHi - bLo).toFixed(4)}（应≈0）`)
+
+    /* 抚摸音效：开关确实决定是否出声 */
+    await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { sound: true } })`, true)
+    const soundOn = await wc.executeJavaScript(`window.__petTest.sfxPat()`, true).catch(() => null)
+    await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { sound: false } })`, true)
+    const soundOff = await wc.executeJavaScript(`window.__petTest.sfxPat()`, true).catch(() => null)
+    console.log(`[selftest] 抚摸音效 ${soundOn === true && soundOff === false ? 'PASS' : 'FAIL'} — 开=${soundOn}，关=${soundOff}`)
+
+    if (orig) {
+      const pick = (o, ks) => ks.reduce((a, k) => (k in (o || {}) ? ((a[k] = o[k]), a) : a), {})
+      const patch = {
+        petting: pick(orig.petting, ['squint', 'headFollow', 'sound', 'hearts', 'reactions', 'speakLines']),
+        idle: pick(orig.idle, ['breath', 'breathAmount']),
+      }
+      await wc.executeJavaScript(`window.__petTest.setSettings(${JSON.stringify(patch)})`, true).catch(() => {})
+    }
+  }
+
   try {
     console.log('[selftest] diag', JSON.stringify(await diag()))
   } catch (err) {

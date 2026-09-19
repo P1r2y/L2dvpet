@@ -9,6 +9,7 @@ import { InteractionManager } from './features/interaction.js'
 import { VoiceService } from './features/voice.js'
 import { ChatService } from './features/chat.js'
 import { EffectsLayer } from './features/fx.js'
+import { SfxService } from './features/sfx.js'
 import { PARAM_CATALOG } from './live2d/params.js'
 import { SpeechBubble } from './ui/bubble.js'
 import { ChatPanel } from './ui/chatPanel.js'
@@ -123,6 +124,7 @@ async function boot() {
       getState: () => app.state,
       patchState: (partial) => saveState(partial),
     })
+    app.sfx = new SfxService({ getSettings: () => app.settings })
     app.chat = new ChatService({ getSettings: () => app.settings, state: app.state, voice: app.voice }).attach()
 
     app.bubble = new SpeechBubble({
@@ -289,6 +291,14 @@ async function boot() {
         react: (kind) => app.pet.react(kind),
         petVisual: (on, head) => app.pet.setPettingVisual(!!on, { head: !!head }),
         openChat: () => app.chatPanel.open(),
+        /** Drives the gaze pointer directly (synthetic mouse moves are unreliable here). */
+        setPointer: (x, y) => {
+          app.pet.setPointer(x ?? null, y ?? null)
+        },
+        /** Fires one pat sound; the boolean says whether one actually played. */
+        sfxPat: (strength = 0.6) => !!app.sfx?.pat(strength, { minGapMs: 0 }),
+        /** Simulates the petting state without a real mouse drag. */
+        petVisual: (on, head = true) => app.pet.setPettingVisual(!!on, { head: !!head }),
         /** Which group the library will auto-play next — the 播放动作 switch. */
         idleMotionGroup: () => app.pet.stage?.model?.internalModel?.motionManager?.groups?.idle ?? null,
         /** Whether the quick dock is currently suppressed. */
@@ -963,6 +973,9 @@ function wireBus() {
   /* ---- petting: hearts appear while stroking the head, and only then ---- */
   bus.on('input:pet-start', ({ head }) => {
     app.lastPetAt = performance.now()
+    // 抚摸音效: one soft pat as the hand lands, then the stroke handler keeps a
+    // gentle rhythm going.
+    if (head) app.sfx?.pat(0.7, { minGapMs: 0 })
     const lines = app.settings.petting.greetLines || []
     if (head && lines.length && Math.random() < 0.35) {
       app.bubble.show(pick(lines), { duration: 3.5 })
@@ -971,6 +984,7 @@ function wireBus() {
 
   bus.on('input:pet-stroke', ({ x, y, head, intensity }) => {
     const cfg = app.settings.petting
+    if (head) app.sfx?.pat(intensity ?? 0.6)
     if (cfg.hearts && head) {
       app.fx.heart(x, y, { rate: cfg.heartRate, scale: 1.15 })
     }

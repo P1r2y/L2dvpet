@@ -221,6 +221,7 @@ export const SETTINGS_TREE = [
         fields: [
           SW('idle.breath', '呼吸起伏'),
           RNG('idle.breathSpeed', '呼吸速度', 0.2, 3, 0.05, '×', (v) => v.toFixed(2)),
+          RNG('idle.breathAmount', '呼吸幅度', 0, 1, 0.05, '%', (v) => Math.round(v * 100)),
           SW('idle.physics', '物理演算'),
         ],
       },
@@ -256,6 +257,8 @@ export const SETTINGS_TREE = [
           SW('petting.hearts', '冒爱心'),
           RNG('petting.heartRate', '爱心密度', 0.2, 3, 0.1, '×', (v) => v.toFixed(1)),
           SW('petting.squint', '舒服地眯眼'),
+          RNG('petting.headFollow', '头部跟随鼠标', 0, 1, 0.05, '%', (v) => Math.round(v * 100)),
+          SW('petting.sound', '抚摸音效'),
           SW('petting.reactions', '动作反馈'),
           SW('petting.speakLines', '台词反馈'),
         ],
