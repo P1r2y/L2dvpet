@@ -1,0 +1,20 @@
+# 本项目为 Windows 专属，源码统一 CRLF（与 .editorconfig 保持一致）。
+# text=auto 让仓库内按 LF 存储、检出为 CRLF，避免换行造成的无意义 diff。
+* text=auto eol=crlf
+
+# 二进制资源：禁止换行转换与文本 diff
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.wav    binary
+*.mp3    binary
+*.moc3   binary
+*.cmo3   binary
+*.psd    binary
+*.zip    binary
+
+# 构建产物与第三方库不计入语言统计
+dist/**                    linguist-generated=true
+dist/vendor/**             linguist-vendored=true
+vendor/**                  linguist-vendored=true
+package-lock.json          linguist-generated=true

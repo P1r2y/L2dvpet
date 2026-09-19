@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      'unsafe-eval' is required by PixiJS v6, which compiles its uniform-sync
+      functions with `new Function`. Everything else stays locked to local
+      app:// resources: no remote scripts, no remote connections from the
+      renderer (LLM/TTS/STT all go through the main process).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline' 'unsafe-eval'; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data: blob:; media-src 'self' app: data: blob:; connect-src 'self' app: data: blob:; font-src 'self' app: data:; object-src 'none'; base-uri 'none';"
+    />
+    <title>桌面小精灵</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ── Live2D stage ───────────────────────────────────────── -->
+      <div id="pet-layer" class="pet-layer">
+        <canvas id="stage"></canvas>
+        <div id="fx-layer" class="fx-layer"></div>
+      </div>
+
+      <!-- ── Speech bubble ──────────────────────────────────────── -->
+      <div id="bubble" class="bubble hidden" role="status" aria-live="polite">
+        <div class="bubble-inner">
+          <div id="bubble-text" class="bubble-text"></div>
+          <div class="bubble-tail"></div>
+        </div>
+        <div id="bubble-actions" class="bubble-actions hidden">
+          <button class="bubble-btn" data-bubble-action="speak" title="重新朗读">🔊</button>
+          <button class="bubble-btn" data-bubble-action="close" title="关闭">✕</button>
+        </div>
+      </div>
+
+      <!-- ── Debug / status badge ───────────────────────────────── -->
+      <div id="status-hud" class="status-hud hidden"></div>
+
+      <!-- ── Quick dock ─────────────────────────────────────────── -->
+      <div id="dock" class="dock hidden">
+        <button class="dock-btn" data-action="chat" title="打开对话 (C)"><span>💬</span></button>
+        <button class="dock-btn" data-action="mic" title="按住说话 / 点击切换 (M)"><span>🎤</span></button>
+        <button class="dock-btn" data-action="speak-toggle" title="语音开关">
+          <span id="dock-speak-icon">🔈</span>
+        </button>
+        <button class="dock-btn" data-action="settings" title="设置 (S)"><span>⚙️</span></button>
+        <button class="dock-btn" data-action="hide" title="隐藏桌宠 (Ctrl+Shift+H)"><span>👁</span></button>
+      </div>
+
+      <!-- ── Chat panel ─────────────────────────────────────────── -->
+      <section id="chat-panel" class="panel chat-panel hidden" aria-label="对话">
+        <header class="panel-head" data-drag-handle="chat">
+          <div class="panel-title">
+            <span class="avatar-dot"></span>
+            <span id="chat-title">小汐</span>
+          </div>
+          <div class="panel-head-actions">
+            <button class="icon-btn" data-action="chat-clear" title="清空对话">🗑</button>
+            <button class="icon-btn" data-action="chat-settings" title="对话设置">⚙</button>
+            <button class="icon-btn" data-action="chat-close" title="关闭">✕</button>
+          </div>
+        </header>
+
+        <div id="chat-log" class="chat-log"></div>
+
+        <div id="chat-typing" class="chat-typing hidden">
+          <span></span><span></span><span></span>
+        </div>
+
+        <div id="chat-record-hint" class="record-hint hidden">
+          <span class="rec-dot"></span><span id="record-text">正在聆听…</span>
+          <button class="mini-btn" data-action="record-cancel">取消</button>
+        </div>
+
+        <footer class="chat-foot">
+          <textarea
+            id="chat-input"
+            class="chat-input"
+            rows="1"
+            placeholder="和我说点什么吧…"
+          ></textarea>
+          <button id="chat-send" class="send-btn" title="发送">➤</button>
+          <button id="chat-mic" class="mic-btn" title="语音输入">🎤</button>
+        </footer>
+      </section>
+
+      <!-- ── Settings panel (VS Code style) ─────────────────────── -->
+      <section id="settings-panel" class="panel settings-panel hidden" aria-label="设置">
+        <header class="vs-titlebar">
+          <span class="vs-title">设置</span>
+          <div class="vs-title-actions">
+            <button class="icon-btn" data-action="settings-reset" title="恢复默认设置">↺</button>
+            <button class="icon-btn" data-action="settings-open-file" title="打开配置文件">⧉</button>
+            <button class="icon-btn" data-action="settings-close" title="关闭">✕</button>
+          </div>
+        </header>
+
+        <div class="vs-searchbar">
+          <input id="settings-search" type="text" placeholder="搜索设置" spellcheck="false" />
+        </div>
+
+        <div class="vs-main">
+          <nav id="settings-nav" class="vs-sidebar"></nav>
+          <div id="settings-body" class="vs-content"></div>
+        </div>
+
+        <footer class="vs-statusbar">
+          <span id="settings-status"></span>
+          <span id="settings-count" class="vs-count"></span>
+        </footer>
+      </section>
+
+      <!-- ── Context menu ───────────────────────────────────────── -->
+      <div id="ctx-menu" class="ctx-menu hidden"></div>
+
+      <!-- ── Toast ──────────────────────────────────────────────── -->
+      <div id="toast" class="toast hidden"></div>
+
+      <!-- ── Loading overlay ────────────────────────────────────── -->
+      <div id="loading" class="loading">
+        <div class="loading-card">
+          <div class="spinner"></div>
+          <div id="loading-text">正在唤醒小精灵…</div>
+          <div id="loading-sub" class="loading-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/live2dcubismcore.min.js"></script>
+    <script src="vendor/pixi.min.js"></script>
+    <script src="vendor/pixi-live2d-display.min.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

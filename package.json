@@ -1,0 +1,21 @@
+{
+  "name": "ai-computer-pet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live2D 桌面宠物 — 视线跟随 / 对话 / 抚摸 / 语音 / 设置面板",
+  "main": "src/main/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "dev": "node scripts/build.mjs --watch",
+    "app": "electron ."
+  },
+  "dependencies": {
+    "pixi-live2d-display": "0.4.0",
+    "pixi.js": "6.5.10"
+  },
+  "devDependencies": {
+    "electron": "38.4.0",
+    "esbuild": "0.25.10"
+  }
+}

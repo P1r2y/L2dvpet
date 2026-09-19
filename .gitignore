@@ -1,0 +1,17 @@
+# 构建产物（由 `npm run build` 生成）
+dist/
+
+# 依赖
+node_modules/
+
+# 自测截图与临时文件
+scripts/selftest-*.png
+scripts/**/*.mp3
+scripts/**/*.wav
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.log
