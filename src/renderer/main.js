@@ -552,7 +552,7 @@ async function boot() {
          * Goes through the real settings pipeline — the engine is chosen in the
          * main process, so a renderer-local override would not be honoured.
          */
-        testPitch: async (provider = 'sapi') => {
+        testPitch: async (provider = 'auto') => {
           const original = {
             ttsProvider: app.settings.voice.ttsProvider,
             pitchShift: app.settings.voice.pitchShift,
@@ -826,7 +826,8 @@ function applyTheme() {
   if (ui.fontSize) root.style.setProperty('--fs', `${ui.fontSize}px`)
   if (ui.panelOpacity) {
     const o = clamp(Number(ui.panelOpacity), 0.3, 1)
-    root.style.setProperty('--panel-bg', `rgba(24, 26, 38, ${o})`)
+    /* 与 VS Code 编辑器底色 (#1e1e1e) 同色，只让不透明度可调。 */
+    root.style.setProperty('--panel-bg', `rgba(30, 30, 30, ${o})`)
   }
 }
 
@@ -1021,7 +1022,7 @@ function wireBus() {
   /* ---- voice ---- */
   bus.on('voice:error', ({ message }) => toastErr(message, 6000))
   bus.on('voice:fallback', ({ label, from, to }) => {
-    const names = { edge: 'Edge TTS', openai: '在线 TTS', sapi: '系统语音', webspeech: '浏览器语音', voicevox: 'VOICEVOX' }
+    const names = { gptsovits: 'GPT-SoVITS', openai: '在线 TTS' }
     toast(label || `${names[from] || from} 不可用，已改用${names[to] || to}`, 'err', 6000)
     updateDockSpeakIcon()
   })
@@ -1029,7 +1030,7 @@ function wireBus() {
     const pretty = { 'ja-JP': '日语', 'en-US': '英语', 'ko-KR': '韩语', 'zh-CN': '中文' }[lang] || lang
     toast(
       `本机没有可用的${pretty}语音引擎，这段${pretty}内容会用现有音色朗读（音色/发音可能不准）。` +
-        `想要${pretty}音色：装 VOICEVOX（日语动漫音色）或让 Edge TTS / 在线 TTS 可用。`,
+        `想要${pretty}音色：让 GPT-SoVITS 服务保持运行，或配置一个支持该语言的在线 TTS 接口。`,
       'err',
       9000
     )

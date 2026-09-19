@@ -13,7 +13,3 @@ indent_size = 2
 # Markdown 不裁掉行尾空格（Markdown 里两个空格 = 换行）
 [*.md]
 trim_trailing_whitespace = false
-
-# Windows 辅助脚本由 PowerShell 5.1 读取，需带 BOM（见 src/main/lib/sapi.cjs）
-[*.ps1]
-charset = utf-8-bom

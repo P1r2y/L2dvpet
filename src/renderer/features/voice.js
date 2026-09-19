@@ -2,10 +2,9 @@
  * VoiceService — text-to-speech playback with real-time lip-sync, plus
  * microphone recording and speech-to-text.
  *
- * Audio from the main process (Edge TTS / OpenAI TTS) is played through an
- * <audio> element routed into Web Audio so an AnalyserNode can drive
- * ParamMouthOpenY from the actual waveform. The offline `webspeech` provider
- * cannot be routed through Web Audio, so a synthetic envelope is used instead.
+ * Audio from the main process (GPT-SoVITS / any OpenAI-compatible TTS) is
+ * played through an <audio> element routed into Web Audio so an AnalyserNode
+ * can drive ParamMouthOpenY from the actual waveform.
  */
 import { bus } from '../core/bus.js'
 import { clamp, cleanForSpeech } from '../core/util.js'
@@ -19,9 +18,9 @@ export class VoiceService {
     this.getState = getState || (() => ({}))
     this.patchState = patchState || (() => {})
     /**
-     * When a cloud TTS engine is unreachable (blocked network, bad key), stop
-     * retrying it on every sentence: remember the failure and speak with the
-     * offline engine until the cooldown expires or the user re-tests it.
+     * When an engine is unreachable (service down, blocked network, bad key),
+     * stop retrying it on every sentence: remember the failure and speak with
+     * the other engine until the cooldown expires or the user re-tests it.
      */
     this.FALLBACK_COOLDOWN_MS = 30 * 60 * 1000
     this.audio = null
@@ -31,9 +30,7 @@ export class VoiceService {
     this.gainNode = null
     this.timeData = null
     this._raf = null
-    this._active = null // 'audio' | 'webspeech' | null
-    this._speechUtterance = null
-    this._speechEnvelope = { t: 0, value: 0, nextAt: 0, target: 0 }
+    this._active = null // 'audio' | null
     this._objectUrl = null
     this.queue = []
     this._speaking = false
@@ -159,15 +156,12 @@ export class VoiceService {
       return false
     }
 
-    // The main process degrades through edge → voicevox → openai → sapi →
-    // webspeech on its own; tell the user when they did not get what they picked.
+    // The main process degrades from GPT-SoVITS to the online engine on its
+    // own; tell the user when they did not get what they picked.
     if (result.fellBack) {
       const names = {
-        edge: 'Edge TTS',
+        gptsovits: 'GPT-SoVITS',
         openai: '在线 TTS',
-        sapi: '系统语音',
-        webspeech: '浏览器语音',
-        voicevox: 'VOICEVOX',
       }
       bus.emit('voice:fallback', {
         from: result.requested,
@@ -178,16 +172,6 @@ export class VoiceService {
     if (result.languageMismatch && !this._warnedLangMismatch[result.lang]) {
       this._warnedLangMismatch[result.lang] = true
       bus.emit('voice:lang-mismatch', { lang: result.lang, provider: result.provider })
-    }
-
-    if (result.kind === 'webspeech') {
-      this.debug.provider = 'webspeech'
-      return this._speakWebSpeech(result.text, {
-        voice: result.voice,
-        rate: result.rate,
-        pitch: result.pitch,
-        volume: result.volume ?? v.volume,
-      })
     }
 
     this.debug.provider = result.provider || ''
@@ -307,63 +291,6 @@ export class VoiceService {
     }
   }
 
-  _speakWebSpeech(text, cfg = {}) {
-    if (!('speechSynthesis' in window)) {
-      bus.emit('voice:error', { message: '当前环境不支持系统语音，请改用 Edge TTS 或在线 TTS' })
-      return false
-    }
-    const v = this.getSettings()?.voice || {}
-    const u = new SpeechSynthesisUtterance(text)
-    u.rate = clamp(Number(cfg.rate ?? v.webSpeechRate ?? 1), 0.1, 10)
-    u.pitch = clamp(Number(cfg.pitch ?? v.webSpeechPitch ?? 1.1), 0, 2)
-    u.volume = clamp(Number(cfg.volume ?? v.volume ?? 0.9), 0, 1)
-
-    const wanted = cfg.voice || v.webSpeechVoice
-    if (wanted) {
-      const match = speechSynthesis.getVoices().find((x) => x.voiceURI === wanted || x.name === wanted)
-      if (match) {
-        u.voice = match
-        u.lang = match.lang
-      }
-    }
-    if (!u.voice) {
-      const zh = speechSynthesis.getVoices().find((x) => /^zh/i.test(x.lang))
-      if (zh) {
-        u.voice = zh
-        u.lang = zh.lang
-      }
-    }
-
-    u.onstart = () => {
-      this._active = 'webspeech'
-      this._setSpeaking(true)
-      this._speechEnvelope = { t: 0, value: 0, nextAt: 0, target: 0 }
-      this._startLipSync()
-    }
-    const finish = () => {
-      this._setSpeaking(false)
-      this._active = null
-      this._stopLipSync()
-      this.pet.setMouthLevel(0)
-    }
-    u.onend = finish
-    u.onerror = (e) => {
-      if (e.error !== 'interrupted' && e.error !== 'canceled') {
-        bus.emit('voice:error', { message: `系统语音出错: ${e.error}` })
-      }
-      finish()
-    }
-    this._speechUtterance = u
-    try {
-      speechSynthesis.cancel()
-      speechSynthesis.speak(u)
-      return true
-    } catch (err) {
-      bus.emit('voice:error', { message: `系统语音启动失败: ${err.message}` })
-      return false
-    }
-  }
-
   _onAudioDone() {
     this._setSpeaking(false)
     this._active = null
@@ -387,13 +314,6 @@ export class VoiceService {
       try {
         this.audio.pause()
         this.audio.currentTime = 0
-      } catch {
-        /* ignore */
-      }
-    }
-    if ('speechSynthesis' in window) {
-      try {
-        speechSynthesis.cancel()
       } catch {
         /* ignore */
       }
@@ -465,25 +385,9 @@ export class VoiceService {
         d.currentTime = this.audio?.currentTime || 0
         d.duration = this.audio?.duration || 0
         d.ctxState = this.audioCtx?.state || 'none'
-      } else if (this._active === 'webspeech') {
-        this.pet.setMouthLevel(this._envelopeStep())
       }
     }
     this._raf = requestAnimationFrame(loop)
-  }
-
-  /** Synthetic mouth envelope for engines we cannot tap (speechSynthesis). */
-  _envelopeStep() {
-    const e = this._speechEnvelope
-    e.t += 1 / 60
-    if (e.t >= e.nextAt) {
-      e.nextAt = e.t + 0.055 + Math.random() * 0.09
-      e.target = Math.random() < 0.18 ? 0.06 : 0.35 + Math.random() * 0.55
-    }
-    e.value += (e.target - e.value) * 0.45
-    // Pause at punctuation-ish moments to look less mechanical.
-    const pause = Math.sin(e.t * 1.7) > 0.985 ? 0.25 : 1
-    return clamp(e.value * pause, 0, 1)
   }
 
   _stopLipSync() {
@@ -665,35 +569,6 @@ export class VoiceService {
   async toggleRecording() {
     if (this.recording) return this.stopRecording()
     return this.startRecording()
-  }
-
-  /* ---------------------------------------------------------------- */
-  /** Voice list for the settings panel (system voices are read locally). */
-  static systemVoices() {
-    if (!('speechSynthesis' in window)) return []
-    return speechSynthesis.getVoices().map((v) => ({
-      id: v.voiceURI,
-      name: `${v.name} · ${v.lang}`,
-      locale: v.lang,
-    }))
-  }
-
-  static async waitForSystemVoices(timeoutMs = 1500) {
-    if (!('speechSynthesis' in window)) return []
-    if (speechSynthesis.getVoices().length) return VoiceService.systemVoices()
-    return new Promise((resolve) => {
-      const t = setTimeout(() => resolve(VoiceService.systemVoices()), timeoutMs)
-      speechSynthesis.addEventListener(
-        'voiceschanged',
-        () => {
-          clearTimeout(t)
-          resolve(VoiceService.systemVoices())
-        },
-        { once: true }
-      )
-      // Chromium sometimes needs a nudge before it populates the list.
-      speechSynthesis.getVoices()
-    })
   }
 }
 

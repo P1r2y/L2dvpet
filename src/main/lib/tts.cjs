@@ -2,20 +2,20 @@
 /**
  * Text-to-speech dispatch. Every provider resolves to the same shape:
  *   { kind: 'audio', mime, base64 }  — renderer plays it through Web Audio
- *   { kind: 'webspeech', text, voice, rate, pitch, volume } — renderer uses speechSynthesis
  * Throws Error with a human-readable Chinese message on failure.
+ *
+ * Two engines only:
+ *   gptsovits — a locally hosted GPT-SoVITS instance, for cloned character voices
+ *   openai    — any OpenAI-compatible POST /audio/speech endpoint
  */
-const edge = require('./edge-tts.cjs')
-const sapi = require('./sapi.cjs')
-const voicevox = require('./voicevox.cjs')
 const gptsovits = require('./gptsovits.cjs')
-const { resolveProfile, voiceForProvider, scalePercentString } = require('./voice-profile.cjs')
+const { resolveProfile, voiceForProvider } = require('./voice-profile.cjs')
 const { resolveEndpoint, parseExtraHeaders } = require('./llm.cjs')
 
 /* ------------------------------------------------------------------ *
  * Pitch shifting ("声线") — provider independent
  *
- * None of these engines expose a usable pitch control, so we do it the way a
+ * Neither engine exposes a usable pitch control, so we do it the way a
  * voice changer does: ask the engine for a *slower* rendition, then play it
  * back faster. `playbackRate` restores the original duration while raising the
  * pitch, and `preservesPitch = false` in the renderer keeps the pitch change.
@@ -25,6 +25,12 @@ const { resolveEndpoint, parseExtraHeaders } = require('./llm.cjs')
 function pitchOf(settings) {
   const p = Number(settings?.voice?.pitchShift)
   return Number.isFinite(p) && p > 0 ? Math.max(0.5, Math.min(2, p)) : 1
+}
+
+/** `'+10%'` -> `1.1`, `'-5%'` -> `0.95`. Used for the per-language speed hint. */
+function percentToMultiplier(value) {
+  const m = /^\s*([+-]?[\d.]+)\s*%?\s*$/.exec(String(value ?? ''))
+  return m ? 1 + Number(m[1]) / 100 : 1
 }
 
 /** OpenAI-compatible POST /v1/audio/speech. */
@@ -80,11 +86,6 @@ async function openaiSpeech(cfg, text, speedMul = 1) {
 }
 
 /**
- * @param {object} settings full settings object
- * @param {string} text
- * @returns {Promise<object>}
- */
-/**
  * Maps an app language tag ("zh-CN") to the code GPT-SoVITS expects ("zh").
  * Anything the model's G2P does not know falls back to Chinese.
  */
@@ -95,6 +96,11 @@ function gsvLangFor(lang) {
   return 'zh'
 }
 
+/**
+ * @param {object} settings full settings object
+ * @param {string} text
+ * @returns {Promise<object>}
+ */
 async function synthesize(settings, text) {
   const v = settings.voice || {}
   const provider = v.ttsProvider || 'auto'
@@ -110,20 +116,6 @@ async function synthesize(settings, text) {
   switch (provider) {
     case 'off':
       return { kind: 'none' }
-
-    case 'webspeech':
-      // speechSynthesis has a native pitch property, so no compensation needed.
-      return {
-        kind: 'webspeech',
-        text: clean,
-        voice: '',
-        rate: Number(v.webSpeechRate ?? 1),
-        pitch: Number(v.webSpeechPitch ?? 1.1) * pitch,
-        volume: Number(v.volume ?? 0.9),
-        lang,
-        mode,
-        detected,
-      }
 
     case 'gptsovits': {
       const g = v.gptsovits || {}
@@ -160,51 +152,8 @@ async function synthesize(settings, text) {
       }
     }
 
-    case 'voicevox': {
-      const speaker = voiceForProvider(profile, 'voicevox')
-      const buf = await voicevox.synthesize(clean, {
-        baseUrl: v.voicevoxBaseUrl,
-        speaker: speaker === null ? 0 : speaker,
-        speedScale: Math.max(0.5, Math.min(2, speedMul)),
-        intonationScale: Number(v.voicevoxIntonation ?? 1),
-        volumeScale: Number(v.voicevoxVolume ?? 1),
-        pitchScale: Number(v.voicevoxPitch ?? 0),
-      })
-      if (!buf.length) throw new Error('VOICEVOX 未返回音频')
-      return {
-        kind: 'audio',
-        mime: 'audio/wav',
-        base64: buf.toString('base64'),
-        playbackRate: pitch,
-        provider: 'voicevox',
-        lang,
-        mode,
-        detected,
-      }
-    }
-
-    case 'sapi': {
-      const buf = await sapi.synthesize(clean, {
-        voice: voiceForProvider(profile, 'sapi'),
-        // sapi.cjs turns this into SSML rate; the pitch compensation is already
-        // folded in, so it must not be applied twice.
-        rate: speedMul,
-        volume: Number(v.volume ?? 0.9),
-      })
-      if (!buf.length) throw new Error('系统语音未返回音频')
-      return {
-        kind: 'audio',
-        mime: 'audio/wav',
-        base64: buf.toString('base64'),
-        playbackRate: pitch,
-        provider: 'sapi',
-        lang,
-        mode,
-        detected,
-      }
-    }
-
-    case 'openai': {
+    case 'openai':
+    default: {
       const result = await openaiSpeech(
         {
           baseUrl: v.openaiBaseUrl,
@@ -212,7 +161,9 @@ async function synthesize(settings, text) {
           model: v.openaiModel,
           voice: voiceForProvider(profile, 'openai') || v.openaiVoice,
           format: 'mp3',
-          speed: 1,
+          // The profile's per-language speed hint is the base; the global pitch
+          // compensation multiplies it.
+          speed: percentToMultiplier(profile.rate),
           extraHeaders: settings.chat?.extraHeaders || '',
         },
         clean,
@@ -222,29 +173,6 @@ async function synthesize(settings, text) {
       Object.assign(result, { lang, mode, detected })
       return result
     }
-
-    case 'edge':
-    default: {
-      // The profile's rate is the base; the global pitch compensation multiplies it.
-      const profileRate = profile.rate || '+0%'
-      const buf = await edge.synthesize(clean, {
-        voice: voiceForProvider(profile, 'edge') || v.edgeVoice || 'zh-CN-XiaoxiaoNeural',
-        rate: scalePercentString(profileRate, speedMul),
-        pitch: v.edgePitch || '+0Hz',
-        volume: v.edgeVolume || '+0%',
-      })
-      if (!buf.length) throw new Error('Edge TTS 未返回音频')
-      return {
-        kind: 'audio',
-        mime: 'audio/mpeg',
-        base64: buf.toString('base64'),
-        playbackRate: pitch,
-        provider: 'edge',
-        lang,
-        mode,
-        detected,
-      }
-    }
   }
 }
 
@@ -253,19 +181,8 @@ async function synthesize(settings, text) {
  * @returns {Promise<Array<{id:string,name:string,locale:string,gender:string}>>}
  */
 async function listVoices(provider) {
-  if (provider === 'edge') return edge.listVoices()
-  if (provider === 'sapi') return sapi.listVoices()
   if (provider === 'openai') return OPENAI_VOICES
   return []
-}
-
-/** VOICEVOX speaker styles, or [] when the engine is not running. */
-async function listVoicevoxSpeakers(baseUrl) {
-  try {
-    return await voicevox.listSpeakers(baseUrl)
-  } catch {
-    return []
-  }
 }
 
 /** Curated OpenAI / gpt-4o-mini-tts voice set (the API has no list endpoint). */
@@ -282,12 +199,40 @@ const OPENAI_VOICES = [
   { id: 'ash', name: 'ash · 从容男声', locale: 'multi', gender: 'Male' },
 ]
 
-/** Providers that need no network and no key — used as automatic fallbacks. */
-const OFFLINE_PROVIDERS = ['sapi', 'webspeech']
-const CLOUD_PROVIDERS = ['edge', 'openai']
+/** Providers that need a key before they are worth trying. */
+const KEYED_PROVIDERS = ['openai']
 
 /**
- * Tries the requested engine, then degrades through the chain until something
+ * Whether an engine can actually voice a given language.
+ *
+ * This matters for the online engine: a Chinese-only TTS endpoint cannot speak
+ * a Japanese line, and hearing Japanese read by the wrong voice is worse than
+ * saying nothing — as long as the user is told why.
+ */
+function providerSupportsLanguage(provider, lang, settings) {
+  if (!lang) return true
+  const profile = require('./voice-profile.cjs').profileFor(settings, lang)
+  switch (provider) {
+    case 'gptsovits': {
+      /*
+       * v2ProPlus is multilingual, and the reference clip's language is a
+       * separate parameter (`prompt_lang`) from the spoken one (`text_lang`).
+       * Capability is therefore a property of the *model*, not of whichever
+       * text_lang happens to be selected. Gating on that mismatch used to
+       * demote GPT-SoVITS behind the generic engine for every Chinese line.
+       */
+      const profileLang = String(profile.lang || lang).slice(0, 2)
+      return ['zh', 'ja', 'en', 'ko', 'yue'].includes(profileLang)
+    }
+    case 'openai':
+      return true // voice catalogues are multilingual
+    default:
+      return true
+  }
+}
+
+/**
+ * Tries the requested engine, then degrades to the other one until something
  * works. Failures are remembered in `failures` (provider -> timestamp) so a
  * blocked engine is not retried on every single sentence.
  *
@@ -296,58 +241,6 @@ const CLOUD_PROVIDERS = ['edge', 'openai']
  * @param {{ failures?: object, cooldownMs?: number }} [opts]
  * @returns {Promise<{result: object, failed: Array<{provider:string,message:string}>}>}
  */
-/**
- * Whether an engine can actually voice a given language.
- *
- * This matters: with Edge unreachable, the offline Windows engine is the only
- * one left, and it has no Japanese voice at all. Without this check, Japanese
- * replies would be read aloud by a Chinese voice — worse than saying nothing.
- */
-function providerSupportsLanguage(provider, lang, settings, installed) {
-  if (!lang) return true
-  const two = lang.slice(0, 2).toLowerCase()
-  const profile = require('./voice-profile.cjs').profileFor(settings, lang)
-  switch (provider) {
-    case 'voicevox':
-      return two === 'ja'
-    case 'gptsovits': {
-      /*
-       * v2ProPlus is multilingual, and the reference clip's language is a
-       * separate parameter (`prompt_lang`) from the spoken one (`text_lang`).
-       * Capability is therefore a property of the *model*, not of whichever
-       * text_lang happens to be selected. Gating on that mismatch used to
-       * demote GPT-SoVITS behind the system voice for every Chinese line.
-       */
-      const profileLang = String(profile.lang || lang).slice(0, 2)
-      return ['zh', 'ja', 'en', 'ko', 'yue'].includes(profileLang)
-    }
-    case 'sapi': {
-      const voices = installed.sapiVoices || []
-      if (!voices.length) return false
-      const want = String(profile.sapi || '').trim().toLowerCase()
-      if (want) {
-        const exact = voices.find((x) => String(x.id).toLowerCase() === want)
-        // An explicitly chosen voice wins even if its locale looks different.
-        return !!exact
-      }
-      return voices.some((x) => String(x.locale || '').toLowerCase().startsWith(two))
-    }
-    case 'edge':
-    case 'openai':
-      return true // multi-lingual catalogues
-    case 'webspeech':
-      // On Windows Chromium's speechSynthesis is backed by the very same SAPI 5
-      // voices, so it can only speak what SAPI can. Elsewhere we cannot
-      // enumerate reliably, so let it try.
-      if (process.platform === 'win32') {
-        return providerSupportsLanguage('sapi', lang, settings, installed)
-      }
-      return true
-    default:
-      return true
-  }
-}
-
 async function synthesizeWithFallback(settings, text, opts = {}) {
   const v = settings.voice || {}
   const requested = v.ttsProvider || 'auto'
@@ -376,18 +269,13 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
     const wait = FAILURE_BACKOFF_MS[Math.min(e.count - 1, FAILURE_BACKOFF_MS.length - 1)]
     return Date.now() - e.at > wait
   }
+
   const hasOpenaiKey = !!(v.openaiApiKey || settings.chat?.apiKey)
-  const sapiVoices = await sapi.listVoices().catch(() => [])
-  const sapiOk = sapiVoices.length > 0
-  const vv = v.voicevoxBaseUrl
-    ? await voicevox.probe(v.voicevoxBaseUrl, 1500).catch(() => ({ ok: false }))
-    : { ok: false }
   const gsv = v.gptsovits?.baseUrl
     ? await gptsovits.probe(v.gptsovits.baseUrl, 1500).catch(() => ({ ok: false }))
     : { ok: false }
 
   const { lang } = resolveProfile(settings, text)
-  const installed = { sapiVoices }
 
   const chain = []
   const push = (p) => {
@@ -397,18 +285,13 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
   // — that is how the user forces a retry from the settings panel.
   if (requested !== 'auto') push(requested)
   // GPT-SoVITS is a cloned character voice, so when it is running it is the
-  // most faithful option and goes ahead of the generic engines.
+  // most faithful option and goes ahead of the generic engine.
   if (gsv.ok) push('gptsovits')
-  push('edge')
-  if (vv.ok) push('voicevox')
   if (hasOpenaiKey) push('openai')
-  if (sapiOk) push('sapi')
-  push('webspeech')
 
   // Engines that can speak this language are tried first. If every one of them
-  // fails we still fall back to the rest, but flag it — hearing Japanese read by
-  // a Chinese voice is better than silence, as long as the user is told.
-  const capable = chain.filter((p) => providerSupportsLanguage(p, lang, settings, installed))
+  // fails we still fall back to the rest, but flag it.
+  const capable = chain.filter((p) => providerSupportsLanguage(p, lang, settings))
   const rest = chain.filter((p) => !capable.includes(p))
   const ordered = [...capable, ...rest]
 
@@ -448,9 +331,7 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
   }
 
   const hint =
-    lang === 'ja-JP'
-      ? '日语需要联网的 Edge TTS、在线 TTS 接口，或本机安装 VOICEVOX；Windows 自带语音没有日语。'
-      : ''
+    'GPT-SoVITS 需要本机服务在运行（设置 → 语音 → GPT-SoVITS 可一键启动）；在线 TTS 接口需要填好地址与 API Key。'
   return {
     result: {
       kind: 'error',
@@ -461,7 +342,7 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
       message:
         (failed.length > 0
           ? failed.map((f) => `${f.provider}: ${f.message}`).join(' | ')
-          : `没有可用的语音引擎${lang ? `（需要 ${lang} 音色）` : ''}`) + (hint ? ` 【${hint}】` : ''),
+          : `没有可用的语音引擎${lang ? `（需要 ${lang} 音色）` : ''}`) + ` 【${hint}】`,
     },
     failed,
   }
@@ -472,9 +353,7 @@ module.exports = {
   synthesizeWithFallback,
   providerSupportsLanguage,
   listVoices,
-  listVoicevoxSpeakers,
   pitchOf,
   OPENAI_VOICES,
-  OFFLINE_PROVIDERS,
-  CLOUD_PROVIDERS,
+  KEYED_PROVIDERS,
 }

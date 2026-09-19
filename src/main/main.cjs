@@ -32,8 +32,6 @@ const defaults = require('../shared/defaults.json')
 const llm = require('./lib/llm.cjs')
 const tts = require('./lib/tts.cjs')
 const stt = require('./lib/stt.cjs')
-const sapi = require('./lib/sapi.cjs')
-const voicevox = require('./lib/voicevox.cjs')
 const gptsovits = require('./lib/gptsovits.cjs')
 const scanGsv = require('./lib/gptsovits-scan.cjs')
 const gsvService = require('./lib/gptsovits-service.cjs')
@@ -554,7 +552,6 @@ function registerIpc() {
       if (failed.length) {
         const map = { ...(state.get().voiceFailures || {}) }
         for (const f of failed) {
-          if (f.provider === 'webspeech') continue
           const prev = map[f.provider]
           const count = (typeof prev === 'number' ? 1 : Number(prev?.count) || 0) + 1
           map[f.provider] = { at: Date.now(), count, error: f.message || '' }
@@ -572,10 +569,7 @@ function registerIpc() {
   ipcMain.handle('tts:voices', async (_e, payload) => {
     try {
       const provider = payload?.provider || settings.get().voice.ttsProvider
-      const voices =
-        provider === 'voicevox'
-          ? await tts.listVoicevoxSpeakers(settings.get().voice.voicevoxBaseUrl)
-          : await tts.listVoices(provider)
+      const voices = await tts.listVoices(provider)
       return { ok: true, voices }
     } catch (err) {
       return { ok: false, message: String(err?.message || err), voices: [] }
@@ -633,18 +627,6 @@ function registerIpc() {
   ipcMain.handle('tts:status', async () => {
     const s = settings.get()
     const failures = state.get().voiceFailures || {}
-    let sapiOk = false
-    let vv = { ok: false }
-    try {
-      sapiOk = await sapi.isAvailable()
-    } catch {
-      /* ignore */
-    }
-    try {
-      vv = await voicevox.probe(s.voice.voicevoxBaseUrl, 1500)
-    } catch {
-      /* ignore */
-    }
     let gsv = { ok: false }
     try {
       gsv = await gptsovits.probe(s.voice.gptsovits?.baseUrl, 1500)
@@ -669,14 +651,11 @@ function registerIpc() {
     }
     return {
       configured: s.voice.ttsProvider,
-      sapiAvailable: sapiOk,
-      voicevoxAvailable: !!vv.ok,
-      voicevoxVersion: vv.version || '',
       gptsovitsAvailable: !!gsv.ok,
       hasOpenaiKey: !!(s.voice.openaiApiKey || s.chat?.apiKey),
       languageMode: s.voice.languageMode || 'auto',
       lastSpokenLanguage: lastSpokenLanguage || null,
-      engines: ['gptsovits', 'edge', 'voicevox', 'openai', 'sapi', 'webspeech'].map(info),
+      engines: ['gptsovits', 'openai'].map(info),
     }
   })
 
@@ -1245,9 +1224,22 @@ async function runSelftest() {
     const eng = await wc.executeJavaScript(`window.__petTest.engineStatus()`, true).catch(() => null)
     console.log('[selftest] engines', JSON.stringify(eng))
 
-    const pitchRows = await wc
-      .executeJavaScript(`window.__petTest.testPitch('sapi')`, true)
-      .catch((e) => [{ error: e.message }])
+    /*
+     * The pitch test has to actually synthesize, so it needs a reachable
+     * engine. Prefer the local clone service, then the online one; when
+     * neither is configured, skip rather than fail — a missing API key is a
+     * setup state, not a regression.
+     */
+    const pitchProvider = eng?.gptsovitsAvailable
+      ? 'gptsovits'
+      : eng?.hasOpenaiKey
+        ? 'openai'
+        : null
+    const pitchRows = pitchProvider
+      ? await wc
+          .executeJavaScript(`window.__petTest.testPitch(${JSON.stringify(pitchProvider)})`, true)
+          .catch((e) => [{ error: e.message }])
+      : null
     for (const r of pitchRows || []) {
       console.log(
         `[selftest] pitch ${r.pitch} -> play=${r.ok} provider=${r.provider} rate=${r.playbackRate} preservesPitch=${r.preservesPitch} src=${r.srcDuration}s` +
@@ -1266,8 +1258,10 @@ async function runSelftest() {
         console.log(
           `[selftest] PITCH ${grows && rateOk && pitchOff ? 'PASS' : 'FAIL'} — 源时长 ${lo.srcDuration}/${mid.srcDuration}/${hi.srcDuration}s 随音调增长=${grows}, 播放倍率=${rateOk}, preservesPitch=false=${pitchOff}`
         )
+      } else if (!pitchProvider) {
+        console.log('[selftest] PITCH SKIP — 未配置可用的语音引擎（GPT-SoVITS 未运行且无在线 TTS Key）')
       } else {
-        console.log('[selftest] PITCH FAIL — 未能取得三次合成结果')
+        console.log(`[selftest] PITCH FAIL — 未能取得三次合成结果（引擎 ${pitchProvider}）`)
       }
     }
   }

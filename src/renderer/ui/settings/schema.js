@@ -31,13 +31,9 @@ const FPS_OPTIONS = [
 ]
 
 const PROVIDER_OPTIONS = [
-  { value: 'auto', label: '自动' },
-  { value: 'gptsovits', label: 'GPT-SoVITS' },
-  { value: 'edge', label: 'Edge TTS' },
-  { value: 'voicevox', label: 'VOICEVOX' },
-  { value: 'openai', label: '在线 TTS 接口' },
-  { value: 'sapi', label: 'Windows 系统语音' },
-  { value: 'webspeech', label: '浏览器内置语音' },
+  { value: 'auto', label: '自动（GPT-SoVITS 优先，失败转在线）' },
+  { value: 'gptsovits', label: 'GPT-SoVITS（本地声音克隆）' },
+  { value: 'openai', label: '在线 TTS 接口（OpenAI 兼容）' },
   { value: 'off', label: '不朗读' },
 ]
 
@@ -426,56 +422,16 @@ export const SETTINGS_TREE = [
         ],
       },
       {
-        id: 'voicevox',
-        label: 'VOICEVOX',
-        fields: [
-          TXT('voice.voicevoxBaseUrl', '服务地址', { wide: true }),
-          { key: 'voice.languageProfiles.ja-JP.voicevox', label: '音色', type: 'select', options: [] },
-          RNG('voice.voicevoxIntonation', '抑扬顿挫', 0.5, 2, 0.05, '×', (v) => v.toFixed(2)),
-          RNG('voice.voicevoxPitch', '额外音高', -0.15, 0.15, 0.01, '', (v) => v.toFixed(2)),
-          RNG('voice.voicevoxVolume', '引擎音量', 0.3, 2, 0.05, '×', (v) => v.toFixed(2)),
-        ],
-      },
-      {
-        id: 'edge',
-        label: 'Edge TTS',
-        fields: [
-          { key: 'voice.languageProfiles.zh-CN.edge', label: '中文音色', type: 'select', options: [] },
-          { key: 'voice.languageProfiles.ja-JP.edge', label: '日语音色', type: 'select', options: [] },
-          { key: 'voice.languageProfiles.en-US.edge', label: '英语音色', type: 'select', options: [] },
-          TXT('voice.edgeRate', '语速'),
-          TXT('voice.edgePitch', '音调'),
-          TXT('voice.edgeVolume', '音量增量'),
-          RESULT('edge-voices'),
-        ],
-      },
-      {
-        id: 'sapi',
-        label: '系统语音',
-        fields: [
-          { key: 'voice.languageProfiles.zh-CN.sapi', label: '中文音色', type: 'select', options: [] },
-          { key: 'voice.languageProfiles.en-US.sapi', label: '英文音色', type: 'select', options: [] },
-          INFO('sapi-info', '系统语音不含日语。更多中文声线可用管理员运行 scripts\\ps\\enable-more-voices.ps1 解锁。'),
-        ],
-      },
-      {
         id: 'openai',
         label: '在线 TTS 接口',
         fields: [
           TXT('voice.openaiBaseUrl', '接口地址', { wide: true }),
           PWD('voice.openaiApiKey', 'API Key'),
           TXT('voice.openaiModel', '模型'),
-          { key: 'voice.languageProfiles.zh-CN.openai', label: '音色', type: 'select', options: [] },
-        ],
-      },
-      {
-        id: 'webspeech',
-        label: '浏览器语音',
-        fields: [
-          { key: 'voice.webSpeechVoice', label: '系统音色', type: 'select', options: [] },
-          RNG('voice.webSpeechRate', '语速', 0.5, 2, 0.01, '×', (v) => v.toFixed(2)),
-          RNG('voice.webSpeechPitch', '音调', 0, 2, 0.01, '', (v) => v.toFixed(2)),
-          SW('voice.webSpeechFallback', '允许作为兜底引擎'),
+          INFO('openai-info', '需兼容 POST /audio/speech。未单独填 Key 时复用「对话」的 API Key。'),
+          { key: 'voice.languageProfiles.zh-CN.openai', label: '中文音色', type: 'select', options: [] },
+          { key: 'voice.languageProfiles.ja-JP.openai', label: '日语音色', type: 'select', options: [] },
+          { key: 'voice.languageProfiles.en-US.openai', label: '英语音色', type: 'select', options: [] },
         ],
       },
       {

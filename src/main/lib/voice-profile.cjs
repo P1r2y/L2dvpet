@@ -31,20 +31,20 @@ const LANGUAGE_IDS = LANGUAGES.map((l) => l.id)
 
 /**
  * Factory defaults per language. `rate` is the engine-neutral speed hint;
- * `sapiRate` overrides it for the offline Windows engine (which is slow and
- * robotic, so it usually wants a nudge).
+ * `openai` is the voice id the online engine uses when the user has not
+ * overridden it for this language.
  */
 const BUILTIN_PROFILES = {
-  'zh-CN': { edge: 'zh-CN-XiaoyiNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+5%' },
-  'ja-JP': { edge: 'ja-JP-NanamiNeural', sapi: '', openai: 'nova', voicevox: 0, rate: '+0%', sapiRate: '+0%' },
-  'en-US': { edge: 'en-US-AriaNeural', sapi: 'Microsoft Zira Desktop', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'zh-TW': { edge: 'zh-TW-HsiaoChenNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'zh-HK': { edge: 'zh-HK-HiuMaanNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'ko-KR': { edge: 'ko-KR-SunHiNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'fr-FR': { edge: 'fr-FR-DeniseNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'de-DE': { edge: 'de-DE-KatjaNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'es-ES': { edge: 'es-ES-ElviraNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
-  'ru-RU': { edge: 'ru-RU-SvetlanaNeural', sapi: '', openai: 'nova', voicevox: null, rate: '+0%', sapiRate: '+0%' },
+  'zh-CN': { openai: 'nova', rate: '+0%' },
+  'ja-JP': { openai: 'nova', rate: '+0%' },
+  'en-US': { openai: 'nova', rate: '+0%' },
+  'zh-TW': { openai: 'nova', rate: '+0%' },
+  'zh-HK': { openai: 'nova', rate: '+0%' },
+  'ko-KR': { openai: 'nova', rate: '+0%' },
+  'fr-FR': { openai: 'nova', rate: '+0%' },
+  'de-DE': { openai: 'nova', rate: '+0%' },
+  'es-ES': { openai: 'nova', rate: '+0%' },
+  'ru-RU': { openai: 'nova', rate: '+0%' },
 }
 
 const FALLBACK_LANGUAGE = 'zh-CN'
@@ -115,25 +115,11 @@ function resolveProfile(settings, text) {
 function voiceForProvider(profile, provider) {
   if (!profile) return ''
   switch (provider) {
-    case 'edge':
-      return profile.edge || ''
-    case 'sapi':
-      return profile.sapi || ''
     case 'openai':
       return profile.openai || ''
-    case 'voicevox':
-      return profile.voicevox === null || profile.voicevox === undefined ? null : Number(profile.voicevox)
     default:
       return ''
   }
-}
-
-/** Shifts an Edge-style "+N%" string, used to fold in the global pitch compensation. */
-function scalePercentString(value, multiplier, fallbackPercent = 0) {
-  const m = /^\s*([+-]?[\d.]+)\s*%?\s*$/.exec(String(value ?? ''))
-  const base = m ? Number(m[1]) / 100 : fallbackPercent / 100
-  const pct = Math.round((1 + base) * multiplier * 100 - 100)
-  return `${pct >= 0 ? '+' : ''}${pct}%`
 }
 
 module.exports = {
@@ -145,5 +131,4 @@ module.exports = {
   profileFor,
   resolveProfile,
   voiceForProvider,
-  scalePercentString,
 }

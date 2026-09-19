@@ -18,14 +18,14 @@
     {
       "id": "roxy-ja",
       "label": "洛琪希 · 日本語",
-      "desc": "Edge 日本語音声，抬高音调贴近她的年龄感",
+      "desc": "日语声线，抬高音调贴近她的年龄感",
       "patch": {
         "voice": {
           "ttsProvider": "auto",
           "languageMode": "ja-JP",
           "pitchShift": 1.15,
           "languageProfiles": {
-            "ja-JP": { "edge": "ja-JP-NanamiNeural", "openai": "nova", "sapi": "", "voicevox": null, "rate": "+0%", "sapiRate": "+0%" }
+            "ja-JP": { "openai": "nova", "rate": "+0%" }
           }
         }
       }
@@ -40,7 +40,7 @@
           "languageMode": "zh-CN",
           "pitchShift": 1.18,
           "languageProfiles": {
-            "zh-CN": { "edge": "zh-CN-XiaoyiNeural", "openai": "nova", "sapi": "Microsoft Huihui Desktop", "voicevox": null, "rate": "+0%", "sapiRate": "+8%" }
+            "zh-CN": { "openai": "nova", "rate": "+0%" }
           }
         }
       }
@@ -55,25 +55,9 @@
           "languageMode": "auto",
           "pitchShift": 1.15,
           "languageProfiles": {
-            "ja-JP": { "edge": "ja-JP-NanamiNeural", "openai": "nova", "sapi": "", "voicevox": null, "rate": "+0%", "sapiRate": "+0%" },
-            "zh-CN": { "edge": "zh-CN-XiaoyiNeural", "openai": "nova", "sapi": "Microsoft Huihui Desktop", "voicevox": null, "rate": "+0%", "sapiRate": "+8%" },
-            "en-US": { "edge": "en-US-AriaNeural", "openai": "nova", "sapi": "Microsoft Zira Desktop", "voicevox": null, "rate": "+0%", "sapiRate": "+0%" }
-          }
-        }
-      }
-    },
-    {
-      "id": "roxy-voicevox",
-      "label": "洛琪希 · VOICEVOX 动漫音色",
-      "desc": "动漫风格日语女声，需自行安装 VOICEVOX",
-      "requires": "voicevox",
-      "patch": {
-        "voice": {
-          "ttsProvider": "auto",
-          "languageMode": "ja-JP",
-          "pitchShift": 1.06,
-          "languageProfiles": {
-            "ja-JP": { "voicevox": 8, "edge": "ja-JP-NanamiNeural", "openai": "nova", "sapi": "", "rate": "+0%", "sapiRate": "+0%" }
+            "ja-JP": { "openai": "nova", "rate": "+0%" },
+            "zh-CN": { "openai": "nova", "rate": "+0%" },
+            "en-US": { "openai": "nova", "rate": "+0%" }
           }
         }
       }

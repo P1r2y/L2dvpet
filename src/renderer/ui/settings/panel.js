@@ -8,7 +8,6 @@
 import { $, clamp, debounce, el } from '../../core/util.js'
 import { bus } from '../../core/bus.js'
 import { toast, toastErr, toastOk } from '../notify.js'
-import { VoiceService } from '../../features/voice.js'
 import { SETTINGS_TREE, ALL_FIELDS } from './schema.js'
 
 /**
@@ -915,9 +914,6 @@ export class SettingsPanel {
     if (!locks['voice.voicePreset']) patch.voice.voicePreset = preset.id
 
     await this.patch(patch)
-    this._edgeVoices = null
-    this._sapiVoices = null
-    this._voicevoxVoices = null
     bus.emit('settings:changed', { path: 'voice.preset' })
     this.render()
     this._result(
@@ -926,13 +922,14 @@ export class SettingsPanel {
       'ok'
     )
 
+    // A preset may depend on a service that is not running (GPT-SoVITS needs its
+    // local server). Say so instead of appearing to have done nothing.
     if (preset.requires) {
       const st = await this.voice.engineStatus().catch(() => null)
-      const up = preset.requires === 'gptsovits' ? st?.gptsovitsAvailable : st?.voicevoxAvailable
-      if (st && !up) {
+      if (st && !st.gptsovitsAvailable) {
         this._result(
           'preset-result',
-          `已套用「${preset.label}」，但未检测到 ${preset.requires === 'gptsovits' ? 'GPT-SoVITS' : 'VOICEVOX'} 服务，暂时不会出声`,
+          `已套用「${preset.label}」，但未检测到 GPT-SoVITS 服务，暂时不会出声`,
           'err'
         )
       }
@@ -985,7 +982,6 @@ export class SettingsPanel {
    * Dynamic option sources
    * ---------------------------------------------------------------- */
   _voiceSource(path) {
-    if (path === 'voice.webSpeechVoice') return { provider: 'webspeech' }
     const m = /^voice\.languageProfiles\.([A-Za-z-]+)\.(\w+)$/.exec(path)
     if (m) return { provider: m[2], lang: m[1] }
     return null
@@ -994,12 +990,8 @@ export class SettingsPanel {
   async _catalogue(provider) {
     const key = `_cat_${provider}`
     if (this[key]) return this[key]
-    let voices = []
-    if (provider === 'webspeech') voices = await VoiceService.waitForSystemVoices()
-    else {
-      const res = await window.pet.tts.voices({ provider })
-      voices = res?.ok && res.voices?.length ? res.voices : []
-    }
+    const res = await window.pet.tts.voices({ provider })
+    const voices = res?.ok && res.voices?.length ? res.voices : []
     this[key] = voices
     return voices
   }
@@ -1034,22 +1026,11 @@ export class SettingsPanel {
       select.textContent = ''
 
       if (!voices.length) {
-        const why =
-          src.provider === 'sapi'
-            ? '未检测到系统语音'
-            : src.provider === 'voicevox'
-              ? '未连接到 VOICEVOX'
-              : src.provider === 'webspeech'
-                ? '本机 Chromium 未提供语音'
-                : src.provider === 'openai'
-                  ? '—'
-                  : '无可用音色'
-        select.appendChild(el('option', { value: '', text: why }))
+        select.appendChild(el('option', { value: '', text: '—' }))
         continue
       }
 
-      const autoLabel = src.provider === 'sapi' ? '系统默认' : src.provider === 'webspeech' ? '自动' : src.provider === 'openai' ? '默认' : null
-      if (autoLabel) select.appendChild(el('option', { value: '', text: autoLabel }))
+      select.appendChild(el('option', { value: '', text: '默认' }))
 
       const two = src.lang ? src.lang.slice(0, 2).toLowerCase() : null
       const matching = two ? voices.filter((v) => String(v.locale || '').toLowerCase().startsWith(two)) : []
@@ -1098,18 +1079,12 @@ export class SettingsPanel {
     this._lastSpokenLanguage = st.lastSpokenLanguage || this._lastSpokenLanguage
     const labels = {
       gptsovits: 'GPT-SoVITS',
-      edge: 'Edge TTS',
-      voicevox: 'VOICEVOX',
       openai: '在线 TTS',
-      sapi: '系统语音',
-      webspeech: '浏览器语音',
     }
     const parts = (st.engines || []).map((e) => {
       const name = labels[e.provider] || e.provider
       if (e.cooling) return `${name} · 冷却 ${e.retryInMin} 分`
       if (e.provider === 'openai' && !st.hasOpenaiKey) return `${name} · 未配置 Key`
-      if (e.provider === 'sapi' && !st.sapiAvailable) return `${name} · 不可用`
-      if (e.provider === 'voicevox' && !st.voicevoxAvailable) return `${name} · 未启动`
       if (e.provider === 'gptsovits' && !st.gptsovitsAvailable) return `${name} · 未启动`
       return `${name} · 可用`
     })

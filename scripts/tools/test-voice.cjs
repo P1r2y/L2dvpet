@@ -9,11 +9,28 @@
  *   node scripts/tools/test-voice.cjs
  */
 const tts = require('../../src/main/lib/tts.cjs')
-const sapi = require('../../src/main/lib/sapi.cjs')
-const voicevox = require('../../src/main/lib/voicevox.cjs')
+const gptsovits = require('../../src/main/lib/gptsovits.cjs')
 const vp = require('../../src/main/lib/voice-profile.cjs')
 const defaults = require('../../src/shared/defaults.json')
 const presets = require('../../src/shared/voice-presets.json').presets
+const fs = require('node:fs')
+const path = require('node:path')
+
+/**
+ * The app's own settings.json when it exists. Without it the GPT-SoVITS weight
+ * and reference-audio paths are empty (they are machine-specific), and every
+ * synthesis attempt answers HTTP 500 — which looks like a broken engine rather
+ * than a script reading the wrong file.
+ */
+function userSettings() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(process.env.APPDATA || '', 'ai-computer-pet', 'settings.json'), 'utf8')
+    )
+  } catch {
+    return {}
+  }
+}
 
 const SAMPLES = {
   'zh-CN': '你好，我是洛琪希·米格路迪亚，从今天起由我来教你魔术。',
@@ -41,25 +58,25 @@ function merge(base, patch) {
 
 function settingsFor(presetId) {
   const p = presets.find((x) => x.id === presetId)
-  return merge(defaults, p ? p.patch : {})
+  return merge(merge(defaults, userSettings()), p ? p.patch : {})
 }
 
 ;(async () => {
   /* ── engines ─────────────────────────────────────────────────────── */
   console.log('=== 引擎可用性 ===')
-  let sapiVoices = []
-  try {
-    sapiVoices = await sapi.listVoices()
-  } catch {
-    /* ignore */
-  }
-  console.log(`  sapi      : ${sapiVoices.length ? '可用' : '不可用'} (${sapiVoices.length} 个音色)`)
-  const vv = await voicevox.probe(defaults.voice.voicevoxBaseUrl, 2500)
-  console.log(`  voicevox  : ${vv.ok ? `运行中 v${vv.version}` : `未运行 (${vv.message})`} — 可选安装，装了就有动漫音色`)
+  const base = merge(defaults, userSettings()).voice
+  const gsv = await gptsovits.probe(base.gptsovits.baseUrl, 2500)
+  console.log(
+    `  gptsovits : ${gsv.ok ? '运行中' : `未运行 (${gsv.message || '无响应'})`} — ${base.gptsovits.baseUrl}` +
+      ` (mode=${base.gptsovits.mode}, 权重=${base.gptsovits.gptWeights ? '已配' : '未配'}, 参考音频=${base.gptsovits.refAudio ? '已配' : '未配'})`
+  )
+  console.log(
+    `  openai    : ${base.openaiApiKey ? '已配置 Key' : '未配置 Key（会跳过）'} — ${base.openaiBaseUrl}`
+  )
 
   /* ── language profiles ───────────────────────────────────────────── */
   console.log('\n=== 每个预设 × 每种语言，实际会选到什么音色 ===')
-  for (const presetId of ['roxy-ja', 'roxy-zh', 'roxy-auto', 'roxy-voicevox']) {
+  for (const presetId of ['roxy-ja', 'roxy-zh', 'roxy-auto']) {
     const s = settingsFor(presetId)
     console.log(`\n[${presetId}]  languageMode=${s.voice.languageMode}  pitch=${s.voice.pitchShift}`)
     for (const [lang, text] of Object.entries(SAMPLES)) {
@@ -68,8 +85,7 @@ function settingsFor(presetId) {
       const used = forced ? s.voice.languageMode : r.detected
       const prof = vp.profileFor(s, used)
       console.log(
-        `   ${lang} -> 判定=${r.detected.padEnd(6)} 实际用=${used.padEnd(6)}` +
-          ` edge=${prof.edge || '-'} sapi=${prof.sapi || '-'} voicevox=${prof.voicevox ?? '-'}`
+        `   ${lang} -> 判定=${r.detected.padEnd(6)} 实际用=${used.padEnd(6)} openai=${prof.openai || '-'}`
       )
     }
   }
@@ -82,12 +98,8 @@ function settingsFor(presetId) {
     const t0 = Date.now()
     const { result, failed } = await tts.synthesizeWithFallback(s, SAMPLES[lang])
     const ms = Date.now() - t0
-    if (result.kind !== 'audio' && result.kind !== 'webspeech') {
+    if (result.kind !== 'audio') {
       console.log(`  ${lang} -> 失败 ${result.message?.slice(0, 80) || result.kind}`)
-      continue
-    }
-    if (result.kind === 'webspeech') {
-      console.log(`  ${lang} -> webspeech (无音频可测) via=${result.provider}`)
       continue
     }
     const info = wavInfo(Buffer.from(result.base64, 'base64'))
