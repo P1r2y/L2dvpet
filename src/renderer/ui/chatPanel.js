@@ -238,7 +238,7 @@ export class ChatPanel {
   }
 
   personaName() {
-    return this.getSettings()?.chat?.personaName || '小汐'
+    return this.getSettings()?.chat?.personaName || '助手'
   }
 
   beginStream() {

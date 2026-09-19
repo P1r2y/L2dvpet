@@ -1343,13 +1343,15 @@ export class SettingsPanel {
   _renderAbout() {
     const i = this.info || {}
     const box = el('div', { class: 'vs-about' })
+    const modelPath = this.getSettings()?.model?.path || '—'
+    const modelShort = modelPath.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
     box.appendChild(
       el('div', {
         html:
-          `<div><b>洛琪希 · Live2D 桌面精灵</b> v${i.version || '1.0.0'}</div>` +
+          `<div><b>Live2D 桌面宠物</b> v${i.version || '1.0.0'}</div>` +
           `<div class="vs-dim">Electron ${i.electron || '?'} · Chromium ${i.chrome || '?'} · Node ${i.node || '?'} · ${i.platform || '-'}</div>` +
           `<div class="vs-dim">配置：${i.settingsPath || '-'}</div>` +
-          `<div class="vs-dim">模型：assets/model/roxy（psd2live 生成 · Cubism 5）</div>` +
+          `<div class="vs-dim">模型：${modelShort}（psd2live 生成 · Cubism 5）</div>` +
           `<div class="vs-dim">操作：左键按住=抚摸　右键拖动=移动　右键单击=菜单</div>` +
           `<div class="vs-dim">快捷键：Ctrl+Shift+H 显隐　Ctrl+Shift+C 对话　Ctrl+Shift+S 设置　Esc 取消</div>`,
       })

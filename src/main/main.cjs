@@ -994,7 +994,7 @@ async function runSelftest() {
 
     // Sample the mouth while TTS plays to prove lip-sync is driven by audio.
     // `void` so we don't block on the promise — we want to sample during playback.
-    wc.executeJavaScript(`void window.__petTest.speak('你好呀，我是小汐，很高兴认识你。')`, true).catch(
+    wc.executeJavaScript(`void window.__petTest.speak('你好呀，我是你的桌面宠物，很高兴认识你。')`, true).catch(
       () => {}
     )
     let maxMouth = 0

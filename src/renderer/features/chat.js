@@ -311,9 +311,10 @@ export class ChatService {
 
   /** Compact transcript for the system prompt / debugging. */
   summary(maxItems = 6) {
+    const who = this.getSettings()?.chat?.personaName || '助手'
     return this.history
       .slice(-maxItems)
-      .map((m) => `${m.role === 'user' ? '用户' : '小汐'}: ${truncate(m.content, 80)}`)
+      .map((m) => `${m.role === 'user' ? '用户' : who}: ${truncate(m.content, 80)}`)
       .join('\n')
   }
 }
