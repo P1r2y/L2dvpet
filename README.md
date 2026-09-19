@@ -35,7 +35,8 @@
 ## 快速开始
 
 ```bash
-cd C:\Users\Administrator\Desktop\work\aicomputerpet
+git clone https://github.com/P1r2y/L2dvpet.git
+cd L2dvpet
 
 npm install        # 首次安装依赖（Electron + PixiJS + Live2D 库）
 npm start          # 构建前端并启动桌宠
