@@ -143,7 +143,7 @@ export class VoiceService {
       result = await bridge.tts.speak({ text: clean, provider: opts.provider })
     } catch (err) {
       if (req !== this._speakReq) return false
-      bus.emit('voice:error', { message: `语音合成失败: ${err.message}` })
+      bus.emit('voice:error', { message: `Speech synthesis failed: ${err.message}` })
       return false
     }
     if (req !== this._speakReq) return false // superseded while synthesizing
@@ -151,7 +151,7 @@ export class VoiceService {
     if (!result || result.kind === 'none') return false
 
     if (result.kind === 'error') {
-      bus.emit('voice:error', { message: result.message || '所有语音引擎都不可用' })
+      bus.emit('voice:error', { message: result.message || 'No speech engine is available' })
       bus.emit('voice:all-failed', { message: result.message })
       return false
     }
@@ -161,12 +161,12 @@ export class VoiceService {
     if (result.fellBack) {
       const names = {
         gptsovits: 'GPT-SoVITS',
-        openai: '在线 TTS',
+        openai: 'Online TTS',
       }
       bus.emit('voice:fallback', {
         from: result.requested,
         to: result.provider,
-        label: `${names[result.requested] || result.requested} 不可用，已改用${names[result.provider] || result.provider}`,
+        label: `${names[result.requested] || result.requested} unavailable — switched to ${names[result.provider] || result.provider}`,
       })
     }
     if (result.languageMismatch && !this._warnedLangMismatch[result.lang]) {
@@ -238,7 +238,7 @@ export class VoiceService {
     } catch (err) {
       if (gen !== this._playGen) return false
       this.debug.lastError = String(err?.message || err)
-      bus.emit('voice:error', { message: `播放失败: ${err.message}` })
+      bus.emit('voice:error', { message: `Playback failed: ${err.message}` })
       this._setSpeaking(false)
       this._active = null
       return false
@@ -405,7 +405,7 @@ export class VoiceService {
   async startRecording() {
     if (this.recording) return true
     if (!this.canRecord) {
-      bus.emit('stt:error', { message: '当前环境不支持录音' })
+      bus.emit('stt:error', { message: 'Recording is not supported in this environment' })
       return false
     }
     const maxSec = clamp(Number(this.getSettings()?.voice?.sttMaxSeconds) || 30, 3, 300)
@@ -416,7 +416,7 @@ export class VoiceService {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       })
     } catch (err) {
-      bus.emit('stt:error', { message: `无法访问麦克风: ${err.message}` })
+      bus.emit('stt:error', { message: `Cannot access the microphone: ${err.message}` })
       return false
     }
 
@@ -437,7 +437,7 @@ export class VoiceService {
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size) this.chunks.push(e.data)
     }
-    rec.onerror = (e) => bus.emit('stt:error', { message: `录音出错: ${e.error?.name || 'unknown'}` })
+    rec.onerror = (e) => bus.emit('stt:error', { message: `Recording error: ${e.error?.name || 'unknown'}` })
 
     rec.start(250)
     this.recording = true
@@ -544,7 +544,7 @@ export class VoiceService {
 
     if (cancel || !blob || blob.size < 1200) {
       bus.emit('stt:state', { state: 'idle' })
-      if (!cancel && auto) bus.emit('stt:error', { message: '没有录到声音' })
+      if (!cancel && auto) bus.emit('stt:error', { message: 'No audio was recorded' })
       return null
     }
 
@@ -559,7 +559,7 @@ export class VoiceService {
 
     bus.emit('stt:state', { state: 'idle' })
     if (!res || !res.ok) {
-      bus.emit('stt:error', { message: res?.message || '语音识别失败' })
+      bus.emit('stt:error', { message: res?.message || 'Speech recognition failed' })
       return null
     }
     bus.emit('stt:result', { text: res.text })

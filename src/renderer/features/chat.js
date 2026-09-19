@@ -156,13 +156,13 @@ export class ChatService {
   async send(userText, { silent = false } = {}) {
     const s = this.getSettings()
     if (!s?.chat?.enabled) {
-      bus.emit('chat:error', { message: '对话功能已在设置中关闭' })
+      bus.emit('chat:error', { message: 'Chat is turned off in Settings' })
       return null
     }
     const cfg = s.chat
     if (!cfg.apiKey) {
       bus.emit('chat:error', {
-        message: '还没有填写 API Key —— 打开「设置 → 对话」填入后即可聊天',
+        message: 'No API Key yet — open Settings → Chat, fill one in, and the chat works',
       })
       return null
     }
@@ -311,10 +311,10 @@ export class ChatService {
 
   /** Compact transcript for the system prompt / debugging. */
   summary(maxItems = 6) {
-    const who = this.getSettings()?.chat?.personaName || '助手'
+    const who = this.getSettings()?.chat?.personaName || 'Pip'
     return this.history
       .slice(-maxItems)
-      .map((m) => `${m.role === 'user' ? '用户' : who}: ${truncate(m.content, 80)}`)
+      .map((m) => `${m.role === 'user' ? 'User' : who}: ${truncate(m.content, 80)}`)
       .join('\n')
   }
 }

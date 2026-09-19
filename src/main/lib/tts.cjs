@@ -2,7 +2,7 @@
 /**
  * Text-to-speech dispatch. Every provider resolves to the same shape:
  *   { kind: 'audio', mime, base64 }  — renderer plays it through Web Audio
- * Throws Error with a human-readable Chinese message on failure.
+ * Throws Error with a human-readable message on failure.
  *
  * Two engines only:
  *   gptsovits — a locally hosted GPT-SoVITS instance, for cloned character voices
@@ -13,7 +13,7 @@ const { resolveProfile, voiceForProvider } = require('./voice-profile.cjs')
 const { resolveEndpoint, parseExtraHeaders } = require('./llm.cjs')
 
 /* ------------------------------------------------------------------ *
- * Pitch shifting ("声线") — provider independent
+ * Pitch shifting ("voice pitch") — provider independent
  *
  * Neither engine exposes a usable pitch control, so we do it the way a
  * voice changer does: ask the engine for a *slower* rendition, then play it
@@ -61,11 +61,11 @@ async function openaiSpeech(cfg, text, speedMul = 1) {
     } catch {
       /* raw */
     }
-    const hint = res.status === 401 ? '（API Key 无效）' : res.status === 404 ? '（地址或模型名错误）' : ''
-    throw new Error(`TTS 请求失败 HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
+    const hint = res.status === 401 ? ' (invalid API key)' : res.status === 404 ? ' (wrong endpoint or model name)' : ''
+    throw new Error(`TTS request failed HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
   }
   const buf = Buffer.from(await res.arrayBuffer())
-  if (!buf.length) throw new Error('TTS 返回了空音频')
+  if (!buf.length) throw new Error('TTS returned empty audio')
   // Trust the server's content type when it sends one — some gateways ignore
   // the requested `response_format` and answer with WAV or Opus regardless.
   const served = String(res.headers.get('content-type') || '')
@@ -105,7 +105,7 @@ async function synthesize(settings, text) {
   const v = settings.voice || {}
   const provider = v.ttsProvider || 'auto'
   const clean = String(text || '').trim()
-  if (!clean) throw new Error('没有可朗读的文本')
+  if (!clean) throw new Error('No text to speak')
 
   const pitch = pitchOf(settings)
   // The renderer plays audio at `playbackRate = pitch`; compensate the engine.
@@ -139,7 +139,7 @@ async function synthesize(settings, text) {
         splitMethod: g.splitMethod,
         speed: speedMul,
       })
-      if (!buf.length) throw new Error('GPT-SoVITS 未返回音频')
+      if (!buf.length) throw new Error('GPT-SoVITS returned no audio')
       return {
         kind: 'audio',
         mime: 'audio/wav',
@@ -187,16 +187,16 @@ async function listVoices(provider) {
 
 /** Curated OpenAI / gpt-4o-mini-tts voice set (the API has no list endpoint). */
 const OPENAI_VOICES = [
-  { id: 'nova', name: 'nova · 温暖女声', locale: 'multi', gender: 'Female' },
-  { id: 'shimmer', name: 'shimmer · 清亮女声', locale: 'multi', gender: 'Female' },
-  { id: 'coral', name: 'coral · 亲和女声', locale: 'multi', gender: 'Female' },
-  { id: 'sage', name: 'sage · 沉稳女声', locale: 'multi', gender: 'Female' },
-  { id: 'alloy', name: 'alloy · 中性', locale: 'multi', gender: 'Neutral' },
-  { id: 'ballad', name: 'ballad · 柔和男声', locale: 'multi', gender: 'Male' },
-  { id: 'echo', name: 'echo · 清朗男声', locale: 'multi', gender: 'Male' },
-  { id: 'fable', name: 'fable · 叙事男声', locale: 'multi', gender: 'Male' },
-  { id: 'onyx', name: 'onyx · 低沉男声', locale: 'multi', gender: 'Male' },
-  { id: 'ash', name: 'ash · 从容男声', locale: 'multi', gender: 'Male' },
+  { id: 'nova', name: 'nova · warm female', locale: 'multi', gender: 'Female' },
+  { id: 'shimmer', name: 'shimmer · bright female', locale: 'multi', gender: 'Female' },
+  { id: 'coral', name: 'coral · friendly female', locale: 'multi', gender: 'Female' },
+  { id: 'sage', name: 'sage · calm female', locale: 'multi', gender: 'Female' },
+  { id: 'alloy', name: 'alloy · neutral', locale: 'multi', gender: 'Neutral' },
+  { id: 'ballad', name: 'ballad · soft male', locale: 'multi', gender: 'Male' },
+  { id: 'echo', name: 'echo · clear male', locale: 'multi', gender: 'Male' },
+  { id: 'fable', name: 'fable · narrative male', locale: 'multi', gender: 'Male' },
+  { id: 'onyx', name: 'onyx · deep male', locale: 'multi', gender: 'Male' },
+  { id: 'ash', name: 'ash · composed male', locale: 'multi', gender: 'Male' },
 ]
 
 /** Providers that need a key before they are worth trying. */
@@ -245,7 +245,7 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
   const v = settings.voice || {}
   const requested = v.ttsProvider || 'auto'
 
-  // "不朗读" is a hard stop, not something to fall back from.
+  // "off" is a hard stop, not something to fall back from.
   if (requested === 'off') return { result: { kind: 'none', provider: 'off', requested }, failed: [] }
 
   const failures = opts.failures || {}
@@ -331,7 +331,7 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
   }
 
   const hint =
-    'GPT-SoVITS 需要本机服务在运行（设置 → 语音 → GPT-SoVITS 可一键启动）；在线 TTS 接口需要填好地址与 API Key。'
+    'GPT-SoVITS needs its local service running (Settings → Voice → GPT-SoVITS starts it in one click); the online TTS endpoint needs a URL and an API key.'
   return {
     result: {
       kind: 'error',
@@ -342,7 +342,7 @@ async function synthesizeWithFallback(settings, text, opts = {}) {
       message:
         (failed.length > 0
           ? failed.map((f) => `${f.provider}: ${f.message}`).join(' | ')
-          : `没有可用的语音引擎${lang ? `（需要 ${lang} 音色）` : ''}`) + ` 【${hint}】`,
+          : `No usable voice engine${lang ? ` (a ${lang} voice is required)` : ''}`) + ` [${hint}]`,
     },
     failed,
   }

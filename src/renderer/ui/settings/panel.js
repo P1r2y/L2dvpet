@@ -11,6 +11,18 @@ import { toast, toastErr, toastOk } from '../notify.js'
 import { SETTINGS_TREE, ALL_FIELDS } from './schema.js'
 
 /**
+ * Demo sentences for the "preview voice" buttons, one per language the pet can
+ * speak. The demo text's language is what selects the voice, so these must stay
+ * in their own language — an English line would audition the English voice even
+ * when the pet is set to Japanese or Chinese.
+ */
+const TTS_SAMPLES = {
+  'zh-CN': '你好，这是当前音色的试听。',
+  'ja-JP': 'こんにちは。これは現在の声のサンプルです。',
+  'en-US': 'Hello, this is a preview of the current voice.',
+}
+
+/**
  * Draws a parameter's recent history as a filled sparkline.
  * Dashed guides mark the model's own min/max so an auto limit is visible
  * against the full travel.
@@ -112,7 +124,7 @@ export class SettingsPanel {
     this.voice = voice
     this.onStateChange = onStateChange
     this.getParamRanges = getParamRanges || (() => ({}))
-    /** Tracing is only switched on while the 模型参数 section is on screen. */
+    /** Tracing is only switched on while the Model parameters section is on screen. */
     this.setTrace = setTrace
     this.getTrace = getTrace
 
@@ -256,13 +268,13 @@ export class SettingsPanel {
     // `locks` has replace semantics in the store, so an empty object clears it.
     await this.patch({ locks })
     this.render()
-    toastOk(locks[path] ? `已锁定 ${path}` : `已解锁 ${path}`, 1600)
+    toastOk(locks[path] ? `Locked ${path}` : `Unlocked ${path}`, 1600)
   }
 
   async _unlockAll() {
     await this.patch({ locks: {} })
     this.render()
-    toastOk('已全部解锁')
+    toastOk('All settings unlocked')
   }
 
   /* ---------------------------------------------------------------- *
@@ -402,8 +414,8 @@ export class SettingsPanel {
     const blocks = this._visibleGroups()
 
     if (!blocks.length) {
-      this.body.appendChild(el('div', { class: 'vs-empty', text: '没有匹配的设置' }))
-      this.countEl.textContent = '0 项'
+      this.body.appendChild(el('div', { class: 'vs-empty', text: 'No matching settings' }))
+      this.countEl.textContent = '0 items'
       return
     }
 
@@ -411,7 +423,7 @@ export class SettingsPanel {
     for (const { section, groups, heading } of blocks) {
       if (heading) {
         this.body.appendChild(el('h2', { class: 'vs-h1', text: section.label }))
-        const leaves = section.groups.map((g) => g.label).join('、')
+        const leaves = section.groups.map((g) => g.label).join(', ')
         if (leaves) this.body.appendChild(el('div', { class: 'vs-sub', text: leaves }))
       } else if (groups.length) {
         this.body.appendChild(el('h2', { class: 'vs-h1', text: `${section.label} · ${groups[0].label}` }))
@@ -439,7 +451,7 @@ export class SettingsPanel {
       }
     }
     if (this.sectionId !== 'params') this.setTrace?.(false)
-    this.countEl.textContent = `${count} 项`
+    this.countEl.textContent = `${count} items`
     this.body.scrollTop = keep
   }
 
@@ -491,7 +503,7 @@ export class SettingsPanel {
         el('button', {
           class: 'vs-lock',
           dataset: { lock: f.key },
-          title: locked ? '解锁' : '锁定（锁定后不可编辑，也不被预设覆盖）',
+          title: locked ? 'Unlock' : 'Lock (locked settings cannot be edited or overwritten by presets)',
           text: locked ? '🔒' : '🔓',
         })
       )
@@ -569,12 +581,12 @@ export class SettingsPanel {
           box.appendChild(
             el('button', {
               class: 'vs-btn',
-              text: '显示',
+              text: 'Show',
               onclick: (e) => {
                 const b = e.currentTarget
                 const show = input.type === 'password'
                 input.type = show ? 'text' : 'password'
-                b.textContent = show ? '隐藏' : '显示'
+                b.textContent = show ? 'Hide' : 'Show'
               },
             })
           )
@@ -624,7 +636,7 @@ export class SettingsPanel {
           select.appendChild(el('option', { value: ov, text: ol, selected: sel }))
         }
         if (!matched && value !== undefined && value !== null && String(value) !== '') {
-          select.appendChild(el('option', { value, text: `${value}（当前）`, selected: true }))
+          select.appendChild(el('option', { value, text: `${value} (current)`, selected: true }))
         }
         select._dynamic = f.dynamic || null
         select._editable = !!f.editable
@@ -701,9 +713,9 @@ export class SettingsPanel {
           },
         })
         for (const o of [
-          { value: 'auto', label: '自动' },
-          { value: 'offset', label: '偏移' },
-          { value: 'fixed', label: '固定' },
+          { value: 'auto', label: 'Auto' },
+          { value: 'offset', label: 'Offset' },
+          { value: 'fixed', label: 'Fixed' },
         ]) {
           modeSel.appendChild(el('option', { value: o.value, text: o.label, selected: o.value === mode }))
         }
@@ -728,14 +740,14 @@ export class SettingsPanel {
               },
             })
 
-          box.appendChild(el('span', { class: 'vs-unit', text: '下限' }))
+          box.appendChild(el('span', { class: 'vs-unit', text: 'Min' }))
           box.appendChild(num('min', r.min))
-          box.appendChild(el('span', { class: 'vs-unit', text: '上限' }))
+          box.appendChild(el('span', { class: 'vs-unit', text: 'Max' }))
           box.appendChild(num('max', r.max))
 
           const reset = el('button', {
             class: 'vs-chip',
-            text: '清除',
+            text: 'Clear',
             disabled: locked || !hasLimits,
             onclick: async () => {
               await set({ min: null, max: null })
@@ -773,7 +785,7 @@ export class SettingsPanel {
           },
         })
         box.append(slider, out)
-        box.appendChild(el('span', { class: 'vs-unit', text: `自动时由 ${f.owner} 驱动` }))
+        box.appendChild(el('span', { class: 'vs-unit', text: `Driven by ${f.owner} in auto mode` }))
         return
       }
 
@@ -799,7 +811,7 @@ export class SettingsPanel {
     else if (kind === 'select') {
       if (t.value === '__custom__') {
         const cur = String(getPath(this.getSettings(), path) || '')
-        const next = window.prompt('自定义值', cur) || cur
+        const next = window.prompt('Custom value', cur) || cur
         t.value = next
         value = next
       } else value = t.value
@@ -849,12 +861,12 @@ export class SettingsPanel {
         break
       case 'test-tts-ja':
         await this._withBusy(btn, () =>
-          this._testTtsLang('ja-JP', 'こんにちは。私はロキシー・ミグルディア。今日も一緒に頑張りましょう。')
+          this._testTtsLang('ja-JP', TTS_SAMPLES['ja-JP'])
         )
         break
       case 'test-tts-zh':
         await this._withBusy(btn, () =>
-          this._testTtsLang('zh-CN', '你好，这是当前音色的试听。')
+          this._testTtsLang('zh-CN', TTS_SAMPLES['zh-CN'])
         )
         break
       case 'refresh-tts':
@@ -863,7 +875,7 @@ export class SettingsPanel {
       case 'reset-tts':
         this.voice.clearFailure()
         await this._refreshTtsStatus()
-        toastOk('已清除降级记录')
+        toastOk('Fallback history cleared')
         break
       case 'apply-hotkey':
         await this._withBusy(btn, () => this._applyHotkey())
@@ -918,7 +930,7 @@ export class SettingsPanel {
     this.render()
     this._result(
       'preset-result',
-      `已套用「${preset.label}」${skipped ? '（部分项已锁定，未覆盖）' : ''}`,
+      `Applied "${preset.label}"${skipped ? ' (some settings are locked and were not overwritten)' : ''}`,
       'ok'
     )
 
@@ -929,7 +941,7 @@ export class SettingsPanel {
       if (st && !st.gptsovitsAvailable) {
         this._result(
           'preset-result',
-          `已套用「${preset.label}」，但未检测到 GPT-SoVITS 服务，暂时不会出声`,
+          `Applied "${preset.label}", but no GPT-SoVITS service was detected — no sound for now`,
           'err'
         )
       }
@@ -949,7 +961,7 @@ export class SettingsPanel {
 
   /**
    * Tracing costs a getParameterValueById per parameter per frame, so it only
-   * runs while the 模型参数 section is on screen.
+   * runs while the Model parameters section is on screen.
    */
   _startCurveLoop() {
     this.setTrace?.(true)
@@ -1011,7 +1023,7 @@ export class SettingsPanel {
           select.appendChild(
             el('option', {
               value: d.index,
-              text: `${d.label} ${d.bounds.width}×${d.bounds.height}${d.primary ? ' 主屏' : ''}`,
+              text: `${d.label} ${d.bounds.width}×${d.bounds.height}${d.primary ? ' (primary)' : ''}`,
               selected: d.index === cur,
             })
           )
@@ -1030,7 +1042,7 @@ export class SettingsPanel {
         continue
       }
 
-      select.appendChild(el('option', { value: '', text: '默认' }))
+      select.appendChild(el('option', { value: '', text: 'Default' }))
 
       const two = src.lang ? src.lang.slice(0, 2).toLowerCase() : null
       const matching = two ? voices.filter((v) => String(v.locale || '').toLowerCase().startsWith(two)) : []
@@ -1049,13 +1061,13 @@ export class SettingsPanel {
         select.appendChild(og)
       }
       if (others.length) {
-        const og = el('optgroup', { label: `其他 (${others.length})` })
+        const og = el('optgroup', { label: `Others (${others.length})` })
         add(others, og)
         select.appendChild(og)
       }
       const has = Array.from(select.options).some((o) => o.value === String(current ?? ''))
       if (!has && current !== undefined && current !== null && String(current) !== '') {
-        select.appendChild(el('option', { value: String(current), text: `${current}（当前）`, selected: true }))
+        select.appendChild(el('option', { value: String(current), text: `${current} (current)`, selected: true }))
       }
     }
 
@@ -1079,30 +1091,30 @@ export class SettingsPanel {
     this._lastSpokenLanguage = st.lastSpokenLanguage || this._lastSpokenLanguage
     const labels = {
       gptsovits: 'GPT-SoVITS',
-      openai: '在线 TTS',
+      openai: 'Online TTS',
     }
     const parts = (st.engines || []).map((e) => {
       const name = labels[e.provider] || e.provider
-      if (e.cooling) return `${name} · 冷却 ${e.retryInMin} 分`
-      if (e.provider === 'openai' && !st.hasOpenaiKey) return `${name} · 未配置 Key`
-      if (e.provider === 'gptsovits' && !st.gptsovitsAvailable) return `${name} · 未启动`
-      return `${name} · 可用`
+      if (e.cooling) return `${name} · cooling down ${e.retryInMin} min`
+      if (e.provider === 'openai' && !st.hasOpenaiKey) return `${name} · no API key`
+      if (e.provider === 'gptsovits' && !st.gptsovitsAvailable) return `${name} · not running`
+      return `${name} · ready`
     })
     node.className = 'vs-result'
     node.textContent = parts.join('　')
-    if (verbose) toastOk('已刷新引擎状态')
+    if (verbose) toastOk('Engine status refreshed')
   }
 
   _refreshLangStatus() {
     const node = document.getElementById('lang-status')
     if (!node) return
     const s = this.getSettings()
-    const labels = { 'zh-CN': '中文', 'ja-JP': '日语', 'en-US': '英语', 'ko-KR': '韩语' }
+    const labels = { 'zh-CN': 'Chinese', 'ja-JP': 'Japanese', 'en-US': 'English', 'ko-KR': 'Korean' }
     const mode = s.voice?.languageMode || 'auto'
-    const t = mode === 'auto' ? '自动识别' : labels[mode] || mode
-    const last = this._lastSpokenLanguage ? `　上次：${labels[this._lastSpokenLanguage] || this._lastSpokenLanguage}` : ''
+    const t = mode === 'auto' ? 'Auto-detect' : labels[mode] || mode
+    const last = this._lastSpokenLanguage ? ` · Last: ${labels[this._lastSpokenLanguage] || this._lastSpokenLanguage}` : ''
     node.className = 'vs-result'
-    node.textContent = `模式：${t}${last}`
+    node.textContent = `Mode: ${t}${last}`
   }
 
   _refreshRigRanges() {
@@ -1111,7 +1123,7 @@ export class SettingsPanel {
       const keys = Object.keys(ranges)
       if (!keys.length) {
         node.className = 'vs-result'
-        node.textContent = '尚未读取到模型参数范围'
+        node.textContent = 'Parameter ranges not loaded yet'
         continue
       }
       node.className = 'vs-result'
@@ -1124,7 +1136,7 @@ export class SettingsPanel {
     if (!node) return
     const locks = Object.keys(this.locks())
     node.className = 'vs-result'
-    node.textContent = locks.length ? locks.join('\n') : '（没有锁定的设置）'
+    node.textContent = locks.length ? locks.join('\n') : '(No locked settings)'
     node.style.whiteSpace = 'pre-wrap'
   }
 
@@ -1132,7 +1144,7 @@ export class SettingsPanel {
    * Actions
    * ---------------------------------------------------------------- */
   async _testLlm() {
-    this._result('llm-result', '连接中…')
+    this._result('llm-result', 'Connecting…')
     const s = this.getSettings()
     const res = await window.pet.llm.test({
       config: {
@@ -1144,16 +1156,16 @@ export class SettingsPanel {
         timeoutMs: 30000,
       },
     })
-    if (res.ok) this._result('llm-result', `连接成功：${res.reply || '(空)'}`, 'ok')
+    if (res.ok) this._result('llm-result', `Connected: ${res.reply || '(empty)'}`, 'ok')
     else this._result('llm-result', res.message, 'err')
   }
 
   async _listModels() {
-    this._result('llm-result', '获取中…')
+    this._result('llm-result', 'Fetching…')
     const s = this.getSettings()
     const res = await window.pet.llm.models({ config: { baseUrl: s.chat.baseUrl, apiKey: s.chat.apiKey } })
     if (!res.ok) return this._result('llm-result', res.message, 'err')
-    if (!res.models.length) return this._result('llm-result', '接口未返回模型列表', 'err')
+    if (!res.models.length) return this._result('llm-result', 'The API returned no models', 'err')
     const input = this.body.querySelector('input[data-path="chat.model"]')
     if (input) {
       let dl = document.getElementById('model-datalist')
@@ -1165,19 +1177,20 @@ export class SettingsPanel {
       dl.textContent = ''
       for (const m of res.models.slice(0, 500)) dl.appendChild(el('option', { value: m }))
     }
-    this._result('llm-result', `获取到 ${res.models.length} 个模型，输入框可下拉选择`, 'ok')
+    this._result('llm-result', `Found ${res.models.length} models — pick one from the dropdown`, 'ok')
   }
 
   async _testTts(btn) {
-    this._result('tts-result', '合成中…')
-    const ok = await this.voice.speak(
-      `你好，我是${this.getSettings().chat?.personaName || '小助手'}，这是当前音色的试听。`,
-      { force: true }
-    )
+    this._result('tts-result', 'Synthesizing…')
+    // Speak a sentence in the configured language: the demo text's language is
+    // what picks the voice, so an English sentence would audition the English
+    // voice even when the pet is set to Japanese or Chinese.
+    const mode = this.getSettings().voice.languageMode
+    const ok = await this.voice.speak(TTS_SAMPLES[mode] || TTS_SAMPLES['en-US'], { force: true })
     const d = this.voice.debug
     this._result(
       'tts-result',
-      ok ? `${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s · 电平 ${d.maxLevel.toFixed(2)}` : '合成或播放失败',
+      ok ? `${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s · level ${d.maxLevel.toFixed(2)}` : 'Synthesis or playback failed',
       ok ? 'ok' : 'err'
     )
     await this._refreshTtsStatus()
@@ -1185,14 +1198,14 @@ export class SettingsPanel {
 
   async _testTtsLang(lang, text) {
     const mode = this.getSettings().voice.languageMode
-    this._result('tts-result', `${lang} 合成中…`)
+    this._result('tts-result', `Synthesizing ${lang}…`)
     try {
       await this.patch({ voice: { languageMode: lang } })
       const ok = await this.voice.speak(text, { force: true })
       const d = this.voice.debug
       this._result(
         'tts-result',
-        ok ? `${lang} · ${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s` : `${lang} 合成失败`,
+        ok ? `${lang} · ${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s` : `${lang} synthesis failed`,
         ok ? 'ok' : 'err'
       )
     } finally {
@@ -1204,7 +1217,7 @@ export class SettingsPanel {
   async _applyHotkey() {
     const acc = this.getSettings().voice.sttHotkey
     const res = await window.pet.app.registerHotkey(acc)
-    this._result('stt-result', res.ok ? (res.accelerator ? `已注册 ${res.accelerator}` : '已清除快捷键') : res.message, res.ok ? 'ok' : 'err')
+    this._result('stt-result', res.ok ? (res.accelerator ? `Registered ${res.accelerator}` : 'Hotkey cleared') : res.message, res.ok ? 'ok' : 'err')
   }
 
   /** Finds a GPT-SoVITS install and fills in every path it can. */
@@ -1214,7 +1227,7 @@ export class SettingsPanel {
     if (!scan?.root) {
       this._result(
         'gsv-result',
-        `未找到 GPT-SoVITS。请把「安装目录」填成包含 api_v2.py 的文件夹。\n已搜索：${(scan?.searched || []).join('、')}`,
+        `GPT-SoVITS not found. Set "Install folder" to the folder that contains api_v2.py.\nSearched: ${(scan?.searched || []).join(', ')}`,
         'err'
       )
       return
@@ -1236,19 +1249,19 @@ export class SettingsPanel {
       g.mode = 'weights'
       g.gptWeights = scan.gptWeights[0].path
       g.sovitsWeights = scan.sovitsWeights[0].path
-      notes.push(`微调模型：${scan.gptWeights[0].name} + ${scan.sovitsWeights[0].name}`)
+      notes.push(`Fine-tuned model: ${scan.gptWeights[0].name} + ${scan.sovitsWeights[0].name}`)
     } else if (scan.pretrained.gpt && scan.pretrained.sovits) {
       // Base models can only do zero-shot, so a reference clip is required.
       g.mode = scan.references.length ? 'audio' : 'weights'
       g.gptWeights = scan.pretrained.gpt
       g.sovitsWeights = scan.pretrained.sovits
-      notes.push('未发现微调模型，已选用内置底模')
+      notes.push('No fine-tuned model found; using the bundled base model')
     }
 
     if (scan.references.length) {
       const ref = scan.references[0]
       g.refAudio = ref.path
-      notes.push(`参考音频：${ref.name}`)
+      notes.push(`Reference audio: ${ref.name}`)
       if (ref.transcript) {
         g.promptText = ref.transcript
         // Guess the prompt language from the transcript's script.
@@ -1259,13 +1272,13 @@ export class SettingsPanel {
             : /[\u4e00-\u9fff]/.test(ref.transcript)
               ? 'zh'
               : 'en'
-        notes.push(`参考文本：${ref.transcript.slice(0, 24)}${ref.transcript.length > 24 ? '…' : ''}`)
+        notes.push(`Reference text: ${ref.transcript.slice(0, 24)}${ref.transcript.length > 24 ? '…' : ''}`)
       } else {
-        notes.push('⚠ 该音频没有同名 .txt 文稿，请手动填「参考音频文本」')
+        notes.push('⚠ No matching .txt transcript for this audio — fill in "Reference audio text" manually')
       }
     } else if (g.mode === 'audio') {
       g.mode = 'weights'
-      notes.push('没有找到参考音频，已切到「常驻模型」模式')
+      notes.push('No reference audio found; switched to Persistent model mode')
     }
 
     await this.patch(patch)
@@ -1275,40 +1288,40 @@ export class SettingsPanel {
     const running = probe?.gptsovitsAvailable
     this._result(
       'gsv-result',
-      `安装目录：${scan.root}\n${notes.join('\n')}\n服务：${running ? '正在运行 ✅' : '未启动 ❌（点「启动服务」或运行 start-gptsovits-api.ps1）'}`,
+      `Install folder: ${scan.root}\n${notes.join('\n')}\nService: ${running ? 'running ✅' : 'not running ❌ (click "Start now" or run start-gptsovits-api.ps1)'}`,
       running ? 'ok' : 'err'
     )
-    toastOk('已检测并填入 GPT-SoVITS 配置')
+    toastOk('GPT-SoVITS settings detected and filled in')
   }
 
   /** Starts GPT-SoVITS through the main process (it owns the child process). */
   async _startGptsovits() {
     const st = this.getSettings()
-    this._result('gsv-result', '正在启动 GPT-SoVITS…（首次加载权重约需 20–60 秒）', 'ok')
+    this._result('gsv-result', 'Starting GPT-SoVITS… (loading the weights takes about 20–60 seconds the first time)', 'ok')
     const res = await window.pet.tts.ensureGptsovits()
     const status = await window.pet.tts.gptsovitsStatus().catch(() => null)
     const lines = [res.message]
     if (status) {
-      lines.push(`安装目录：${status.root || '（未设置）'}`)
-      lines.push(`服务：${status.running ? `运行中 ${status.host}:${status.port}` : '未运行'}`)
+      lines.push(`Install folder: ${status.root || '(not set)'}`)
+      lines.push(`Service: ${status.running ? `running at ${status.host}:${status.port}` : 'not running'}`)
     }
     if (!res.ok) this._result('gsv-result', lines.join('\n'), 'err')
     else this._result('gsv-result', lines.join('\n'), 'ok')
   }
 
   async _reset() {
-    if (!window.confirm('恢复所有设置为默认值？锁定的项也会被一并重置。')) return
+    if (!window.confirm('Restore all settings to their defaults? Locked settings are reset too.')) return
     await window.pet.settings.reset()
     bus.emit('settings:reloaded')
     this.render()
-    toastOk('已恢复默认设置')
+    toastOk('Settings restored to defaults')
   }
 
   _flashSaved() {
     if (!this.statusEl) return
-    this.statusEl.textContent = '已保存'
+    this.statusEl.textContent = 'Saved'
     setTimeout(() => {
-      if (this.statusEl.textContent === '已保存') this.statusEl.textContent = ''
+      if (this.statusEl.textContent === 'Saved') this.statusEl.textContent = ''
     }, 1500)
   }
 
@@ -1323,12 +1336,12 @@ export class SettingsPanel {
     box.appendChild(
       el('div', {
         html:
-          `<div><b>Live2D 桌面宠物</b> v${i.version || '1.0.0'}</div>` +
+          `<div><b>Live2D Desktop Pet</b> v${i.version || '1.0.0'}</div>` +
           `<div class="vs-dim">Electron ${i.electron || '?'} · Chromium ${i.chrome || '?'} · Node ${i.node || '?'} · ${i.platform || '-'}</div>` +
-          `<div class="vs-dim">配置：${i.settingsPath || '-'}</div>` +
-          `<div class="vs-dim">模型：${modelShort}（psd2live 生成 · Cubism 5）</div>` +
-          `<div class="vs-dim">操作：左键按住=抚摸　右键拖动=移动　右键单击=菜单</div>` +
-          `<div class="vs-dim">快捷键：Ctrl+Shift+H 显隐　Ctrl+Shift+C 对话　Ctrl+Shift+S 设置　Esc 取消</div>`,
+          `<div class="vs-dim">Config: ${i.settingsPath || '-'}</div>` +
+          `<div class="vs-dim">Model: ${modelShort} (generated by psd2live · Cubism 5)</div>` +
+          `<div class="vs-dim">Controls: hold left button = pet · drag right button = move · right click = menu</div>` +
+          `<div class="vs-dim">Shortcuts: Ctrl+Shift+H show/hide · Ctrl+Shift+C chat · Ctrl+Shift+S settings · Esc cancel</div>`,
       })
     )
     const row = el('div', { class: 'vs-buttons' })
@@ -1336,15 +1349,15 @@ export class SettingsPanel {
     window.pet.app.getAutoLaunch().then((on) => (launch.checked = !!on))
     launch.addEventListener('change', async () => {
       const v = await window.pet.app.setAutoLaunch(launch.checked)
-      toastOk(v ? '已设置开机自启' : '已取消开机自启')
+      toastOk(v ? 'Auto-launch enabled' : 'Auto-launch disabled')
     })
     row.append(
-      el('label', { class: 'vs-check' }, launch, el('span', { text: '开机自启' })),
-      el('button', { class: 'vs-btn', text: '配置文件', onclick: () => window.pet.settings.openFile() }),
-      el('button', { class: 'vs-btn', text: '开发者工具', onclick: () => window.pet.win.devtools() }),
-      el('button', { class: 'vs-btn', text: '重载界面', onclick: () => window.pet.win.reload() }),
-      el('button', { class: 'vs-btn', text: '隐藏桌宠', onclick: () => window.pet.win.hide() }),
-      el('button', { class: 'vs-btn danger', text: '退出', onclick: () => window.pet.win.quit() })
+      el('label', { class: 'vs-check' }, launch, el('span', { text: 'Launch at login' })),
+      el('button', { class: 'vs-btn', text: 'Config file', onclick: () => window.pet.settings.openFile() }),
+      el('button', { class: 'vs-btn', text: 'Developer tools', onclick: () => window.pet.win.devtools() }),
+      el('button', { class: 'vs-btn', text: 'Reload UI', onclick: () => window.pet.win.reload() }),
+      el('button', { class: 'vs-btn', text: 'Hide pet', onclick: () => window.pet.win.hide() }),
+      el('button', { class: 'vs-btn danger', text: 'Quit', onclick: () => window.pet.win.quit() })
     )
     box.appendChild(row)
     return box

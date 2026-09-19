@@ -16,7 +16,7 @@ export class SfxService {
     this._lastPat = 0
   }
 
-  /** 设置 → 抚摸 → 抚摸音效, and the shared voice volume. */
+  /** Settings → Petting → Petting sound, and the shared voice volume. */
   _config() {
     const s = this.getSettings() || {}
     return {

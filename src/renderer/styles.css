@@ -1,6 +1,7 @@
 /* ==========================================================================
-   桌面小精灵 — 样式表
-   窗口本身是全屏透明的，只有具体元素可见；不可见区域由主进程设为鼠标穿透。
+   Desktop sprite — stylesheet
+   The window itself is full-screen and transparent: only individual elements are
+   visible, and the main process makes the invisible areas click-through.
    ========================================================================== */
 
 :root {
@@ -26,7 +27,7 @@
   --vs-ok: #89d185;
   --vs-err: #f48771;
 
-  /* 由「设置 → 外观」驱动：主题色 / 面板不透明度 / 字号 */
+  /* Driven by Settings → Appearance: accent colour / panel opacity / font size */
   --accent: #007acc;
   --accent-soft: #007acc33;
   --accent-strong: #4daafc;
@@ -303,7 +304,8 @@ body {
 }
 
 /* ── Panels (shared) ────────────────────────────────────────────────────── */
-/* VS Code 风格：编辑器底色、1px 描边、方角、无毛玻璃、无弹跳入场。 */
+/* VS Code style: editor background colour, 1px border, square corners, no frosted
+   glass, no bounce-in. */
 .panel {
   position: absolute;
   display: flex;
@@ -457,7 +459,7 @@ body {
   margin-bottom: 2px;
 }
 
-/* 用户气泡是实心强调色，暗灰在上面读不清 */
+/* User bubbles are solid accent colour — dark grey is unreadable on top of them */
 .msg.user .msg-emotion {
   color: rgba(255, 255, 255, 0.75);
 }

@@ -40,7 +40,7 @@ export class QuickDock {
   }
 
   /**
-   * 设置 → 界面 → 显示快捷按钮条. Off means the dock never appears — not just
+   * Settings → Interface → Show quick buttons. Off means the dock never appears — not just
    * hidden right now, so a later hover cannot bring it back.
    */
   setEnabled(on) {

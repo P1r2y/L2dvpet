@@ -54,7 +54,7 @@ function decodeSegments(seg) {
       pts.push({ t: seg.Segments[i + 1], v: seg.Segments[i + 2] })
       i += 7
     } else {
-      break // 未知类型，停止解码
+      break // unknown type — stop decoding
     }
   }
   return { pts, duration: m.Duration ?? 0 }
@@ -106,14 +106,14 @@ const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(3))
 
 const targets = process.argv.slice(2)
 if (!targets.length) {
-  console.error('用法: node scripts/tools/inspect-model-params.cjs <目录或文件> [...]')
+  console.error('Usage: node scripts/tools/inspect-model-params.cjs <dir-or-file> [...]')
   process.exit(1)
 }
 
 for (const target of targets) {
   const abs = path.resolve(target)
   if (!fs.existsSync(abs)) {
-    console.log(`\n### ${target} —— 不存在\n`)
+    console.log(`\n### ${target} — does not exist\n`)
     continue
   }
   const files = fs.statSync(abs).isDirectory() ? walk(abs) : [abs]
@@ -123,22 +123,22 @@ for (const target of targets) {
   for (const f of cdi) {
     const s = summariseCdi(f)
     console.log(`\n[cdi3] ${path.basename(f)}`)
-    console.log(`  参数 (${s.params.length}): ${s.params.join(', ')}`)
-    console.log(`  分组: ${s.groups.join(', ')}`)
-    console.log(`  组合参数: ${JSON.stringify(s.combined)}`)
+    console.log(`  Parameters (${s.params.length}): ${s.params.join(', ')}`)
+    console.log(`  Groups: ${s.groups.join(', ')}`)
+    console.log(`  Combined parameters: ${JSON.stringify(s.combined)}`)
   }
 
   const motions = files.filter((f) => f.endsWith('.motion3.json'))
   for (const f of motions) {
     const s = summariseMotion(f)
     console.log(
-      `\n[motion] ${path.basename(f)}  时长 ${s.duration}s  末帧 ${s.lastKeyTime}s  Loop=${s.loop}  Fps=${s.fps}  曲线 ${s.curveCount}`
+      `\n[motion] ${path.basename(f)}  duration ${s.duration}s  last key ${s.lastKeyTime}s  Loop=${s.loop}  Fps=${s.fps}  curves ${s.curveCount}`
     )
     if (!s.params.length) {
-      console.log('  (无 Parameter 曲线)')
+      console.log('  (no Parameter curves)')
       continue
     }
-    console.log(`  ${'参数'.padEnd(20)} ${'关键帧'.padStart(6)}  ${'最小'.padStart(9)} ${'最大'.padStart(9)}   轨迹`)
+    console.log(`  ${'Parameter'.padEnd(20)} ${'Keys'.padStart(6)}  ${'Min'.padStart(9)} ${'Max'.padStart(9)}   Trace`)
     for (const p of s.params) {
       const trace = p.trace.map((q) => `${fmt(q.t)}s:${fmt(q.v)}`).join('  ')
       console.log(

@@ -12,6 +12,17 @@ const os = require('node:os')
 const path = require('node:path')
 const gsv = require('../../src/main/lib/gptsovits.cjs')
 
+/**
+ * The probe sentence must be written in the language the request declares:
+ * the text's language is what the model reads, so an English line with
+ * `textLang: 'zh'` would audition the wrong voice and can sound like a failure.
+ */
+const PROBE_TEXT = {
+  zh: '你好，这是当前音色的试听。',
+  ja: 'こんにちは。これは現在の声のサンプルです。',
+  en: 'Hello, this is a preview of the current voice.',
+}
+
 function loadSettings() {
   const p = path.join(os.homedir(), 'AppData', 'Roaming', 'ai-computer-pet', 'settings.json')
   try {
@@ -22,10 +33,10 @@ function loadSettings() {
 }
 
 function checkFile(label, p) {
-  if (!p) return console.log(`  ${label.padEnd(14)} （未设置）`)
+  if (!p) return console.log(`  ${label.padEnd(14)} (not set)`)
   const ok = fs.existsSync(p)
   const size = ok ? `${(fs.statSync(p).size / 1048576).toFixed(1)} MB` : ''
-  console.log(`  ${label.padEnd(14)} ${ok ? '✅ 存在' : '❌ 找不到'}  ${size}  ${p}`)
+  console.log(`  ${label.padEnd(14)} ${ok ? '✅ exists' : '❌ not found'}  ${size}  ${p}`)
 }
 
 ;(async () => {
@@ -33,32 +44,33 @@ function checkFile(label, p) {
   const cfg = s?.voice?.gptsovits || {}
   const baseUrl = process.argv[2] || cfg.baseUrl || gsv.DEFAULT_BASE_URL
 
-  console.log('=== GPT-SoVITS 接入检查 ===\n')
-  console.log(`服务地址: ${baseUrl}`)
+  console.log('=== GPT-SoVITS connectivity check ===\n')
+  console.log(`Service URL: ${baseUrl}`)
   const probe = await gsv.probe(baseUrl, 3000)
   if (probe.ok) {
-    console.log('  服务状态: ✅ 正在运行')
+    console.log('  Service: ✅ running')
   } else {
-    console.log(`  服务状态: ❌ 连不上（${probe.message}）`)
-    console.log('\n  启动方法（在 GPT-SoVITS 目录下）：')
+    console.log(`  Service: ❌ unreachable (${probe.message})`)
+    console.log('\n  How to start it (from the GPT-SoVITS directory):')
     console.log('    python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml')
   }
 
-  console.log('\n模型文件:')
-  checkFile('GPT 权重', process.argv[3] || cfg.gptWeights)
-  checkFile('SoVITS 权重', process.argv[4] || cfg.sovitsWeights)
-  checkFile('参考音频', cfg.refAudio)
+  console.log('\nModel files:')
+  checkFile('GPT weights', process.argv[3] || cfg.gptWeights)
+  checkFile('SoVITS weights', process.argv[4] || cfg.sovitsWeights)
+  checkFile('Reference audio', cfg.refAudio)
 
-  console.log('\n配置:')
-  console.log(`  参考方式   ${cfg.mode || 'weights'}`)
-  console.log(`  合成语言   ${cfg.textLang || 'zh'}`)
-  console.log(`  切分方式   ${cfg.splitMethod || 'cut5'}`)
-  if (cfg.promptText) console.log(`  参考文本   ${cfg.promptText.slice(0, 40)}${cfg.promptText.length > 40 ? '…' : ''}`)
+  console.log('\nConfig:')
+  console.log(`  Reference mode  ${cfg.mode || 'weights'}`)
+  console.log(`  Synthesis lang  ${cfg.textLang || 'zh'}`)
+  console.log(`  Split method    ${cfg.splitMethod || 'cut5'}`)
+  if (cfg.promptText) console.log(`  Prompt text     ${cfg.promptText.slice(0, 40)}${cfg.promptText.length > 40 ? '…' : ''}`)
 
   if (probe.ok) {
-    console.log('\n试合成:')
+    console.log('\nTest synthesis:')
+    const textLang = cfg.textLang || 'zh'
     try {
-      const buf = await gsv.synthesize('你好，这是当前音色的试听。', {
+      const buf = await gsv.synthesize(PROBE_TEXT[textLang] || PROBE_TEXT.en, {
         baseUrl,
         useWeights: cfg.mode === 'weights',
         gptWeights: process.argv[3] || cfg.gptWeights,
@@ -66,19 +78,19 @@ function checkFile(label, p) {
         refAudio: cfg.refAudio,
         promptText: cfg.promptText,
         promptLang: cfg.promptLang || 'zh',
-        textLang: cfg.textLang || 'zh',
+        textLang,
         splitMethod: cfg.splitMethod || 'cut5',
       })
       const isWav = buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF'
-      console.log(`  ✅ 生成 ${buf.length} 字节  ${isWav ? '(WAV)' : '(格式异常)'}`)
+      console.log(`  ✅ generated ${buf.length} bytes  ${isWav ? '(WAV)' : '(bad format)'}`)
       const out = path.join(__dirname, 'gptsovits-test.wav')
       fs.writeFileSync(out, buf)
-      console.log(`  已保存到 ${out}，可以直接播放试听`)
+      console.log(`  Saved to ${out} — play it to preview`)
     } catch (err) {
       console.log(`  ❌ ${err.message}`)
     }
   }
 
-  console.log('\n若还没有权重：用自己的 GPT-SoVITS 微调权重，或用「参考音频」模式做零样本克隆。')
-  console.log('把 GPT 权重 / SoVITS 权重（或参考音频）路径填进 设置 → 语音 → GPT-SoVITS。')
+  console.log('\nNo weights yet? Fine-tune your own GPT-SoVITS weights, or use "reference audio" mode for zero-shot cloning.')
+  console.log('Put the GPT weights / SoVITS weights (or reference audio) paths in Settings → Voice → GPT-SoVITS.')
 })()

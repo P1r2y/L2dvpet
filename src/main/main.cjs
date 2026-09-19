@@ -1,12 +1,14 @@
 'use strict'
 /**
- * AI 桌面小精灵 — Electron 主进程
+ * AI desktop pet — Electron main process
  *
- * 职责：
- *  - 创建全屏透明、置顶、默认鼠标穿透的宠物窗口
- *  - 通过自定义 app:// 协议提供本地资源（避免 file:// 的 XHR 限制）
- *  - 托盘图标与全局快捷键
- *  - 提供 LLM / TTS / STT 的本地代理（绕开渲染进程的跨域限制）
+ * Responsibilities:
+ *  - create the pet window: full-screen, transparent, always-on-top and
+ *    click-through by default
+ *  - serve local assets through a custom app:// protocol (avoids the XHR limits
+ *    of file://)
+ *  - tray icon and global shortcuts
+ *  - local proxy for LLM / TTS / STT (works around the renderer's CORS limits)
  */
 const {
   app,
@@ -133,7 +135,7 @@ function createWindow() {
     hasShadow: false,
     show: false,
     backgroundColor: '#00000000',
-    title: '桌面小精灵',
+    title: 'AI Desktop Pet',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -272,13 +274,13 @@ function buildTrayMenu() {
   const s = settings.get()
   const visible = !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()
   return Menu.buildFromTemplate([
-    { label: '显示 / 隐藏桌宠', accelerator: 'CommandOrControl+Shift+H', click: () => toggleVisibility() },
+    { label: 'Show / hide pet', accelerator: 'CommandOrControl+Shift+H', click: () => toggleVisibility() },
     { type: 'separator' },
-    { label: '打开对话', accelerator: 'CommandOrControl+Shift+C', click: () => showAndSend({ type: 'open-chat' }) },
-    { label: '设置…', accelerator: 'CommandOrControl+Shift+S', click: () => showAndSend({ type: 'open-settings' }) },
+    { label: 'Open chat', accelerator: 'CommandOrControl+Shift+C', click: () => showAndSend({ type: 'open-chat' }) },
+    { label: 'Settings…', accelerator: 'CommandOrControl+Shift+S', click: () => showAndSend({ type: 'open-settings' }) },
     { type: 'separator' },
     {
-      label: '鼠标穿透（点击穿过桌宠）',
+      label: 'Click-through (clicks pass through the pet)',
       type: 'checkbox',
       checked: !currentlyInteractive,
       click: (item) => {
@@ -289,7 +291,7 @@ function buildTrayMenu() {
       },
     },
     {
-      label: '始终置顶',
+      label: 'Always on top',
       type: 'checkbox',
       checked: !!s.display.alwaysOnTop,
       click: (item) => {
@@ -298,7 +300,7 @@ function buildTrayMenu() {
       },
     },
     {
-      label: '语音朗读',
+      label: 'Speak replies',
       type: 'checkbox',
       checked: !!s.voice.ttsEnabled,
       click: (item) => {
@@ -307,12 +309,12 @@ function buildTrayMenu() {
       },
     },
     { type: 'separator' },
-    { label: '重置位置', click: () => sendToRenderer({ type: 'reset-position' }) },
-    { label: '重新加载', click: () => mainWindow && mainWindow.webContents.reload() },
-    { label: '开发者工具', click: () => mainWindow && mainWindow.webContents.openDevTools({ mode: 'detach' }) },
+    { label: 'Reset position', click: () => sendToRenderer({ type: 'reset-position' }) },
+    { label: 'Reload', click: () => mainWindow && mainWindow.webContents.reload() },
+    { label: 'Developer tools', click: () => mainWindow && mainWindow.webContents.openDevTools({ mode: 'detach' }) },
     { type: 'separator' },
     {
-      label: '退出',
+      label: 'Quit',
       click: () => {
         quitting = true
         app.quit()
@@ -327,7 +329,7 @@ let quitting = false
 function refreshTray() {
   if (!tray) return
   tray.setContextMenu(buildTrayMenu())
-  tray.setToolTip('桌面小精灵')
+  tray.setToolTip('AI Desktop Pet')
 }
 
 function createTray() {
@@ -338,8 +340,8 @@ function createTray() {
 }
 
 /**
- * 设置 → 显示 → 显示托盘图标. Hiding the tray is safe: the window can still be
- * brought back with Ctrl+Shift+H or from the pet's own menus.
+ * Settings → Display → Show tray icon. Hiding the tray is safe: the window can
+ * still be brought back with Ctrl+Shift+H or from the pet's own menus.
  */
 function setTrayEnabled(enabled) {
   if (enabled) {
@@ -464,7 +466,7 @@ function registerIpc() {
     root: ROOT,
     displays: screen.getAllDisplays().map((d, i) => ({
       index: i,
-      label: d.label || `显示器 ${i + 1}`,
+      label: d.label || `Display ${i + 1}`,
       bounds: d.bounds,
       primary: d.id === screen.getPrimaryDisplay().id,
     })),
@@ -514,7 +516,7 @@ function registerIpc() {
         if (!event.sender.isDestroyed()) {
           event.sender.send('llm:error', {
             id,
-            message: aborted ? '请求已取消或超时' : String(err?.message || err),
+            message: aborted ? 'Request cancelled or timed out' : String(err?.message || err),
             aborted,
           })
         }
@@ -544,8 +546,8 @@ function registerIpc() {
       const reply = await llm.chatOnce(
         { ...cfg, maxTokens: 32 },
         [
-          { role: 'system', content: '你是一个测试助手，只回复两个字：成功' },
-          { role: 'user', content: '连接测试' },
+          { role: 'system', content: 'You are a test assistant. Reply with exactly one word: OK' },
+          { role: 'user', content: 'Connection test' },
         ],
         AbortSignal.timeout(Number(cfg.timeoutMs) || 60000)
       )
@@ -732,9 +734,9 @@ function registerSttHotkey(accelerator) {
       sttHotkeyRegistered = acc
       return { ok: true, accelerator: acc }
     }
-    return { ok: false, message: `快捷键 ${acc} 已被其他程序占用` }
+    return { ok: false, message: `Shortcut ${acc} is already taken by another program` }
   } catch (err) {
-    return { ok: false, message: `快捷键无效: ${err.message}` }
+    return { ok: false, message: `Invalid shortcut: ${err.message}` }
   }
 }
 
@@ -830,7 +832,7 @@ async function runSelftest() {
       await new Promise((r) => setTimeout(r, waitMs))
       const img = await grabFrame(wc)
       if (!img || img.isEmpty()) {
-        console.error(`[selftest] ${name} -> 空帧（离屏渲染可能不可用）`)
+        console.error(`[selftest] ${name} -> empty frame (offscreen rendering may be unavailable)`)
         return
       }
       const p = path.join(dir, `${base}-${name}.png`)
@@ -1008,7 +1010,7 @@ async function runSelftest() {
       true
     )
 
-    const chatPromise = wc.executeJavaScript(`window.__petTest.chat('请介绍一下你自己')`, true)
+    const chatPromise = wc.executeJavaScript(`window.__petTest.chat('Tell me about yourself')`, true)
     await new Promise((r) => setTimeout(r, 900))
     await shot('api-streaming', null, 0)
 
@@ -1025,7 +1027,7 @@ async function runSelftest() {
 
     // Sample the mouth while TTS plays to prove lip-sync is driven by audio.
     // `void` so we don't block on the promise — we want to sample during playback.
-    wc.executeJavaScript(`void window.__petTest.speak('你好呀，我是你的桌面宠物，很高兴认识你。')`, true).catch(
+    wc.executeJavaScript(`void window.__petTest.speak('Hi there, I am your desktop pet — nice to meet you.')`, true).catch(
       () => {}
     )
     let maxMouth = 0
@@ -1074,7 +1076,7 @@ async function runSelftest() {
           true
         )
         .catch((e) => ({ error: e.message }))
-      console.log('[selftest] LIPSYNC 诊断', JSON.stringify(dbg))
+      console.log('[selftest] LIPSYNC diagnosis', JSON.stringify(dbg))
     }
 
     /*
@@ -1087,7 +1089,7 @@ async function runSelftest() {
       const br = await wc.executeJavaScript(`window.__petTest.bubbleRect()`, true)
       const mb = (await diag()).modelBounds
       if (!br) {
-        console.log('[selftest] BUBBLE FAIL — 气泡未显示')
+        console.log('[selftest] BUBBLE FAIL — bubble not shown')
       } else {
         const right = mb ? mb.left + mb.width : null
         const top = mb ? mb.top : null
@@ -1103,7 +1105,7 @@ async function runSelftest() {
         const above = top === null || br.bottom <= top + 24
         console.log(
           `[selftest] BUBBLE ${onScreen && anchored && above ? 'PASS' : 'FAIL'} — rect=(${br.left},${br.top})-(${br.right},${br.bottom}) ` +
-            `tailRight=${br.tailRight} below=${br.below} | 模型右上角=(${right === null ? '?' : Math.round(right)},${top === null ? '?' : Math.round(top)}) win=${br.winW}x${br.winH}`
+            `tailRight=${br.tailRight} below=${br.below} | model top-right=(${right === null ? '?' : Math.round(right)},${top === null ? '?' : Math.round(top)}) win=${br.winW}x${br.winH}`
         )
       }
     } catch (err) {
@@ -1125,57 +1127,57 @@ async function runSelftest() {
       .catch((e) => ({ ok: false, message: e.message }))
     console.log(`[selftest] STT(mic)    ${stt2?.ok ? 'PASS' : 'FAIL'} —`, JSON.stringify(stt2))
 
-    /* ---- 模型参数：18 个 psd2live 参数是否都能手动驱动 ---- */
+    /* ---- model params: can all 18 psd2live params be driven manually? ---- */
     const allParams = await wc
       .executeJavaScript(`window.__petTest.testAllParams()`, true)
       .catch((e) => ({ error: e.message }))
     if (allParams.error) {
-      console.log('[selftest] 模型参数 FAIL —', allParams.error)
+      console.log('[selftest] model params FAIL —', allParams.error)
     } else {
       const ok = allParams.passed === allParams.total
       console.log(
-        `[selftest] 模型参数 ${ok ? 'PASS' : 'FAIL'} — ${allParams.passed}/${allParams.total} 个参数可手动驱动` +
-          (ok ? '' : `，失败：${JSON.stringify(allParams.failures)}`)
+        `[selftest] model params ${ok ? 'PASS' : 'FAIL'} — ${allParams.passed}/${allParams.total} params can be driven manually` +
+          (ok ? '' : `, failed: ${JSON.stringify(allParams.failures)}`)
       )
     }
 
-    /* ---- 模型参数：自动模式上下限 ---- */
+    /* ---- model params: auto-mode upper / lower limits ---- */
     const limitTest = await wc
       .executeJavaScript(`window.__petTest.testAutoLimits()`, true)
       .catch((e) => ({ error: e.message }))
     if (limitTest.error) {
-      console.log('[selftest] 参数上下限 FAIL —', limitTest.error)
+      console.log('[selftest] param limits FAIL —', limitTest.error)
     } else {
       const ok = limitTest.clampedHigh && limitTest.clampedLow && limitTest.traced
       console.log(
-        `[selftest] 参数上下限 ${ok ? 'PASS' : 'FAIL'} — ` +
-          `上限 ${limitTest.raw}→${limitTest.high}（限 ${limitTest.limitHigh}）, ` +
-          `下限 ${limitTest.raw}→${limitTest.low}（限 ${limitTest.limitLow}）, ` +
-          `曲线采样 ${limitTest.traced} 点`
+        `[selftest] param limits ${ok ? 'PASS' : 'FAIL'} — ` +
+          `upper ${limitTest.raw}→${limitTest.high} (limit ${limitTest.limitHigh}), ` +
+          `lower ${limitTest.raw}→${limitTest.low} (limit ${limitTest.limitLow}), ` +
+          `curve sampled ${limitTest.traced} points`
       )
     }
 
-    /* ---- 参数锁定：锁定后预设不得覆盖 ---- */
+    /* ---- param locks: a preset must not overwrite a locked param ---- */
     const lockRes = await wc
       .executeJavaScript(`window.__petTest.testLock('voice.pitchShift')`, true)
       .catch((e) => ({ error: e.message }))
     if (lockRes.error) {
-      console.log('[selftest] 锁定 FAIL —', lockRes.error)
+      console.log('[selftest] lock FAIL —', lockRes.error)
     } else {
       console.log(
-        `[selftest] 锁定 ${lockRes.lockHeld && lockRes.unlockApplied ? 'PASS' : 'FAIL'} — ` +
-          `预设 ${lockRes.original}→${lockRes.probeValue}, found=${lockRes.found}, ` +
-          `锁定中未被覆盖=${lockRes.lockHeld}, 解锁后生效=${lockRes.unlockApplied}`
+        `[selftest] lock ${lockRes.lockHeld && lockRes.unlockApplied ? 'PASS' : 'FAIL'} — ` +
+          `preset ${lockRes.original}→${lockRes.probeValue}, found=${lockRes.found}, ` +
+          `held while locked=${lockRes.lockHeld}, applied after unlock=${lockRes.unlockApplied}`
       )
-      console.log(`[selftest]   锁定轨迹 ${JSON.stringify(lockRes.trace)}`)
+      console.log(`[selftest]   lock trace ${JSON.stringify(lockRes.trace)}`)
     }
 
-    /* ---- 动作参数：必须与 psd2live 生成的 motion 曲线相容 ---- */
+    /* ---- motion params: must stay compatible with the motion curves psd2live generates ---- */
     const ranges = await wc
       .executeJavaScript(`window.__petTest.paramRanges()`, true)
       .catch(() => ({}))
     console.log(
-      '[selftest] 模型参数范围',
+      '[selftest] model param ranges',
       Object.entries(ranges || {})
         .filter(([, v]) => v && v.index >= 0)
         .map(([k, v]) => `${k.replace('Param', '')}[${v.min},${v.max}]`)
@@ -1187,7 +1189,7 @@ async function runSelftest() {
         .executeJavaScript(`window.__petTest.testReaction(${JSON.stringify(motion)})`, true)
         .catch((e) => ({ error: e.message }))
       if (r.error) {
-        console.log(`[selftest] 动作 ${motion} -> 失败: ${r.error}`)
+        console.log(`[selftest] motion ${motion} -> failed: ${r.error}`)
         continue
       }
       // What matters is that the authored excursion reaches the mesh at all.
@@ -1197,15 +1199,15 @@ async function runSelftest() {
       // hitting both authored extremes exactly.
       const excursion = r.max - r.min
       const want = motion === 'nod' ? 15 : 20
-      const authored = motion === 'nod' ? 'AngleY 0→−18→+6（共 24°）' : 'AngleX 0→−20→+20（共 40°）'
+      const authored = motion === 'nod' ? 'AngleY 0→−18→+6 (24° total)' : 'AngleX 0→−20→+20 (40° total)'
       const ok = excursion >= want
       console.log(
-        `[selftest] 动作 ${motion} -> ${ok ? 'PASS' : 'FAIL'} 区间 [${r.min}, ${r.max}] 摆幅 ${excursion.toFixed(1)}°  ` +
-          `曲线 ${authored}  | 睁眼最低 ${r.eyeMin} | 果冻眼 [${r.jellyMin}, ${r.jellyMax}]`
+        `[selftest] motion ${motion} -> ${ok ? 'PASS' : 'FAIL'} range [${r.min}, ${r.max}] swing ${excursion.toFixed(1)}°  ` +
+          `curve ${authored}  | lowest eye-open ${r.eyeMin} | jelly eye [${r.jellyMin}, ${r.jellyMax}]`
       )
     }
 
-    /* ---- idle motion 自带的呼吸与头部摇摆是否还在生效 ---- */
+    /* ---- idle motion: is its baked-in breathing and head sway still effective? ---- */
     await wc.executeJavaScript(`window.__petTest.applied()`, true).catch(() => null)
     {
       let breathMin = Infinity
@@ -1230,13 +1232,13 @@ async function runSelftest() {
       const breathOk = breathMax - breathMin > 0.25
       const swayOk = angleZMax - angleZMin > 0.8
       console.log(
-        `[selftest] 待机曲线 ${breathOk && swayOk ? 'PASS' : 'FAIL'} — 呼吸 ${breathMin.toFixed(2)}~${breathMax.toFixed(2)}（idle 曲线 0↔1）` +
-          `，头部摇摆 ${angleZMin.toFixed(2)}~${angleZMax.toFixed(2)}°（idle 曲线 ±2°）`
+        `[selftest] idle curves ${breathOk && swayOk ? 'PASS' : 'FAIL'} — breath ${breathMin.toFixed(2)}~${breathMax.toFixed(2)} (idle curve 0↔1)` +
+          `, head sway ${angleZMin.toFixed(2)}~${angleZMax.toFixed(2)}° (idle curve ±2°)`
       )
     }
 
 
-  /* ---- GPT-SoVITS 端到端 ---- */
+  /* ---- GPT-SoVITS end to end ---- */
     if (process.argv.includes('--selftest-gsv')) {
       const gsv = await wc
         .executeJavaScript(`window.__petTest.testGptsovits()`, true)
@@ -1245,7 +1247,7 @@ async function runSelftest() {
       await shot('gsv-speaking', null, 300)
     }
 
-    /* ---- 声线 / pitch shift ---- */
+    /* ---- voice pitch / pitch shift ---- */
     const eng = await wc.executeJavaScript(`window.__petTest.engineStatus()`, true).catch(() => null)
     console.log('[selftest] engines', JSON.stringify(eng))
 
@@ -1281,12 +1283,12 @@ async function runSelftest() {
         const rateOk = Math.abs(lo.playbackRate - 0.8) < 0.01 && Math.abs(hi.playbackRate - 1.3) < 0.01
         const pitchOff = lo.preservesPitch === false && hi.preservesPitch === false
         console.log(
-          `[selftest] PITCH ${grows && rateOk && pitchOff ? 'PASS' : 'FAIL'} — 源时长 ${lo.srcDuration}/${mid.srcDuration}/${hi.srcDuration}s 随音调增长=${grows}, 播放倍率=${rateOk}, preservesPitch=false=${pitchOff}`
+          `[selftest] PITCH ${grows && rateOk && pitchOff ? 'PASS' : 'FAIL'} — source durations ${lo.srcDuration}/${mid.srcDuration}/${hi.srcDuration}s grow with pitch=${grows}, playbackRate=${rateOk}, preservesPitch=false=${pitchOff}`
         )
       } else if (!pitchProvider) {
-        console.log('[selftest] PITCH SKIP — 未配置可用的语音引擎（GPT-SoVITS 未运行且无在线 TTS Key）')
+        console.log('[selftest] PITCH SKIP — no usable voice engine configured (GPT-SoVITS is not running and there is no online TTS key)')
       } else {
-        console.log(`[selftest] PITCH FAIL — 未能取得三次合成结果（引擎 ${pitchProvider}）`)
+        console.log(`[selftest] PITCH FAIL — could not get all three synthesis results (engine ${pitchProvider})`)
       }
     }
 
@@ -1294,7 +1296,7 @@ async function runSelftest() {
       await wc
         .executeJavaScript(`window.__petTest.setSettings(${JSON.stringify(restoreSettings)})`, true)
         .catch(() => {})
-      console.log('[selftest] 已还原本次自测覆盖前的接口配置')
+      console.log('[selftest] restored the endpoint config this self-test had overwritten')
     }
   }
 
@@ -1345,7 +1347,7 @@ async function runSelftest() {
        * so treat it as a hint and judge this probe on the screenshot.
        */
       console.log(
-        `[selftest] mouth fixed=${value} -> applied 回读=${a?.mouthOpenY}（该值偶发不回读，以 selftest-mouth-${value}.png 的渲染为准）`
+        `[selftest] mouth fixed=${value} -> applied read-back=${a?.mouthOpenY} (this value intermittently fails to read back — judge by the render in selftest-mouth-${value}.png)`
       )
       for (const id of [
         'ArtMeshFace',
@@ -1374,10 +1376,10 @@ async function runSelftest() {
         const spans = rows
           .map((r) => ({ id: r.id, s: r.uvSpan, v: r.uvSpanV, w: r.w, h: r.h }))
           .sort((a, b) => (a.s ?? 9) - (b.s ?? 9))
-        console.log('[selftest] 全部 drawable 的 UV 跨度（升序，前 12）:')
+        console.log('[selftest] UV spans of every drawable (ascending, first 12):')
         for (const r of spans.slice(0, 12)) {
           console.log(
-            `       ${String(r.id).padEnd(26)} uvSpan=${String(r.s).padEnd(9)}x${String(r.v).padEnd(9)} 网格尺寸=${r.w}x${r.h}`
+            `       ${String(r.id).padEnd(26)} uvSpan=${String(r.s).padEnd(9)}x${String(r.v).padEnd(9)} meshSize=${r.w}x${r.h}`
           )
         }
       }
@@ -1401,7 +1403,7 @@ async function runSelftest() {
       await new Promise((r) => setTimeout(r, 500))
       const d = await wc.executeJavaScript(`window.__petTest.dumpDrawables()`, true).catch(() => null)
       const f = (d?.drawables || []).find((r) => r.id === 'ArtMeshFace')
-      console.log(`[selftest] 对照 ParamAngleX=${angle} -> face bbox=${JSON.stringify(f?.bbox)} sample=${JSON.stringify(f?.sample)}`)
+      console.log(`[selftest] control ParamAngleX=${angle} -> face bbox=${JSON.stringify(f?.bbox)} sample=${JSON.stringify(f?.sample)}`)
     }
     await wc.executeJavaScript(
       `window.__petTest.setSettings({ modelParams: { enabled: false, items: {} } })`,
@@ -1411,22 +1413,23 @@ async function runSelftest() {
   }
 
   /*
-   * GPT-SoVITS 的 GBK 过滤是个隐晦的 workaround（见 gptsovits.cjs 注释）：
-   * 服务端编码不了的字符会让整条请求失败，改成空格后必须仍有声音。
-   * 这里把它钉死，免得日后被顺手"简化"掉。
+   * The GPT-SoVITS GBK filter is an obscure workaround (see the comment in
+   * gptsovits.cjs): a character the server cannot encode fails the whole
+   * request, so replacing it with a space must still leave audio behind. Pinned
+   * down here so it cannot be "simplified away" later.
    */
   {
     const cases = [
-      ['ロキシー・ミグルディア', 'ロキシー ミグルディア', '无 GBK 编码的间隔号'],
-      ['星★と→と①', '星★と→と①', '有 GBK 编码的符号应原样保留'],
-      ['あ💧い', 'あ い', 'emoji（星平面）'],
+      ['ロキシー・ミグルディア', 'ロキシー ミグルディア', 'middle dot with no GBK encoding'],
+      ['星★と→と①', '星★と→と①', 'symbols that do have a GBK encoding are kept as-is'],
+      ['あ💧い', 'あ い', 'emoji (astral plane)'],
     ]
     const bad = cases.filter(([input, want]) => gptsovits.toGbkSafe(input) !== want)
     console.log(
-      `[selftest] GBK 过滤 ${bad.length ? 'FAIL' : 'PASS'} — ${cases.length - bad.length}/${cases.length}` +
+      `[selftest] GBK filter ${bad.length ? 'FAIL' : 'PASS'} — ${cases.length - bad.length}/${cases.length}` +
         (bad.length
-          ? ` 不符: ${bad.map(([i]) => i).join(' / ')}`
-          : `（编码表 ${gptsovits.GBK_CHARS ? gptsovits.GBK_CHARS.size : 'N/A'} 字）`)
+          ? ` mismatched: ${bad.map(([i]) => i).join(' / ')}`
+          : ` (charset ${gptsovits.GBK_CHARS ? gptsovits.GBK_CHARS.size : 'N/A'} chars)`)
     )
   }
 
@@ -1459,7 +1462,7 @@ async function runSelftest() {
     }
     const quiet = minL > 0.98 && minR > 0.98
     console.log(
-      `[selftest] 关自动眨眼 ${quiet ? 'PASS' : 'FAIL'} — 7.2s 内最低 睁眼L=${minL.toFixed(3)} 睁眼R=${minR.toFixed(3)}，${n} 次采样（应全程 ≥0.98）`
+      `[selftest] auto-blink off ${quiet ? 'PASS' : 'FAIL'} — lowest over 7.2s: eyeL=${minL.toFixed(3)} eyeR=${minR.toFixed(3)}, ${n} samples (expected ≥0.98 throughout)`
     )
     /*
      * The flip side: suppressing blinking must not flatten authored motion
@@ -1474,7 +1477,7 @@ async function runSelftest() {
       .executeJavaScript(`window.__petTest.testReaction('nod')`, true)
       .catch((e) => ({ error: e.message }))
     console.log(
-      `[selftest] 动作眯眼（信息）— 关自动眨眼时 Nod 的睁眼最低=${nod?.eyeMin}（动作作者写 0.75，乘上 smile 的 0.9 预期约 0.62；0.98 以上说明压眼被完全盖掉）`
+      `[selftest] motion squint (informational) — with auto-blink off, Nod's lowest eye-open=${nod?.eyeMin} (the motion author wrote 0.75; × smile's 0.9 predicts ≈0.62, and ≥0.98 means the press is fully overridden)`
     )
     await wc.executeJavaScript(
       `window.__petTest.setSettings({ idle: { autoBlink: ${priorAutoBlink === false ? 'false' : 'true'} } })`,
@@ -1485,8 +1488,8 @@ async function runSelftest() {
   /*
    * Settings that were declared in the UI but reached no consumer until now.
    * Assert the two that are observable from here so they cannot go dead again
-   * without a red line; 显示托盘图标 is not observable because the self-test
-   * never creates a tray in the first place.
+   * without a red line; "show tray icon" is not observable because the
+   * self-test never creates a tray in the first place.
    */
   {
     await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { dockVisible: false } })`, true)
@@ -1506,21 +1509,23 @@ async function runSelftest() {
 
     const ok = dockOff === true && groupOff !== 'Idle' && groupOn === 'Idle'
     console.log(
-      `[selftest] 开关落实 ${ok ? 'PASS' : 'FAIL'} — 快捷条关后隐藏=${dockOff}；播放动作关后 idle 组=${JSON.stringify(groupOff)}，开回后=${JSON.stringify(groupOn)}`
+      `[selftest] settings wiring ${ok ? 'PASS' : 'FAIL'} — dock hidden when off=${dockOff}; idle group with motions off=${JSON.stringify(groupOff)}, back on=${JSON.stringify(groupOn)}`
     )
   }
 
   /*
-   * 本轮新增 / 修复的设置，逐条验证「确有作用」。
+   * Settings added / fixed this round, each verified to "actually do something".
    *
-   * 静态审计只能证明设置被读到 —— petting.squint 就是被读了（main.js 里读它去
-   * 触发一次 happy 反应），但真正的持续眯眼是硬编码的 0.58，设置根本没接上去。
-   * 所以这几条一律看可观测的行为差异，不看代码里有没有出现这个名字。
+   * A static audit can only prove a setting is read — petting.squint was read
+   * (main.js read it to fire one happy reaction), yet the real sustained squint
+   * was a hard-coded 0.58 and the setting was never wired up at all. So these
+   * checks all look at observable behaviour, never at whether the name appears
+   * in the code.
    */
   {
     const orig = await wc.executeJavaScript(`window.__petTest.settings()`, true).catch(() => null)
 
-    /* 舒服地眯眼：开 → 眼睛被压下去；关 → 全程睁着 */
+    /* comfortable squint: on → the eyes are pressed down; off → wide open throughout */
     const eyeMinWhilePetting = async (squint) => {
       await wc.executeJavaScript(
         `window.__petTest.setSettings({ petting: { squint: ${squint}, sound: false, hearts: false, reactions: false, speakLines: false } })`,
@@ -1541,10 +1546,10 @@ async function runSelftest() {
     const eyeOn = await eyeMinWhilePetting(true)
     const eyeOff = await eyeMinWhilePetting(false)
     console.log(
-      `[selftest] 抚摸·眯眼 ${eyeOn < 0.75 && eyeOff > 0.9 ? 'PASS' : 'FAIL'} — 开时睁眼最低=${eyeOn.toFixed(3)}（应 <0.75），关时=${eyeOff.toFixed(3)}（应 >0.9）`
+      `[selftest] petting·squint ${eyeOn < 0.75 && eyeOff > 0.9 ? 'PASS' : 'FAIL'} — lowest eye-open with squint on=${eyeOn.toFixed(3)} (expected <0.75), off=${eyeOff.toFixed(3)} (expected >0.9)`
     )
 
-    /* 头部跟随鼠标：抚摸中头仍随光标摆动，0 则完全停住 */
+    /* head follows the cursor: while petting the head still swings with the pointer, 0 freezes it */
     const headSpanWhilePetting = async (follow) => {
       await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { squint: false, headFollow: ${follow} } })`, true)
       await wc.executeJavaScript(`window.__petTest.petVisual(true, true)`, true)
@@ -1573,10 +1578,10 @@ async function runSelftest() {
     const spanFollow = await headSpanWhilePetting(1)
     const spanParked = await headSpanWhilePetting(0)
     console.log(
-      `[selftest] 抚摸·头部跟随 ${spanFollow > spanParked + 2 ? 'PASS' : 'FAIL'} — 跟随 100% 时 AngleX 摆幅 ${spanFollow.toFixed(2)}°，0% 时 ${spanParked.toFixed(2)}°`
+      `[selftest] petting·head follow ${spanFollow > spanParked + 2 ? 'PASS' : 'FAIL'} — AngleX swing at 100% follow ${spanFollow.toFixed(2)}°, at 0% ${spanParked.toFixed(2)}°`
     )
 
-    /* 呼吸幅度：0% 时 ParamBreath 必须恒定 */
+    /* breath amount: ParamBreath must stay constant at 0% */
     await wc.executeJavaScript(`window.__petTest.setSettings({ idle: { breath: true, breathAmount: 0 } })`, true)
     await new Promise((r) => setTimeout(r, 400))
     let bLo = Infinity
@@ -1589,14 +1594,14 @@ async function runSelftest() {
       }
       await new Promise((r) => setTimeout(r, 60))
     }
-    console.log(`[selftest] 呼吸幅度 ${bHi - bLo < 0.02 ? 'PASS' : 'FAIL'} — 幅度 0% 时 ParamBreath 摆幅 ${(bHi - bLo).toFixed(4)}（应≈0）`)
+    console.log(`[selftest] breath amount ${bHi - bLo < 0.02 ? 'PASS' : 'FAIL'} — ParamBreath swing at 0% amount ${(bHi - bLo).toFixed(4)} (expected ≈0)`)
 
-    /* 抚摸音效：开关确实决定是否出声 */
+    /* petting sound: the toggle really does decide whether it plays */
     await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { sound: true } })`, true)
     const soundOn = await wc.executeJavaScript(`window.__petTest.sfxPat()`, true).catch(() => null)
     await wc.executeJavaScript(`window.__petTest.setSettings({ petting: { sound: false } })`, true)
     const soundOff = await wc.executeJavaScript(`window.__petTest.sfxPat()`, true).catch(() => null)
-    console.log(`[selftest] 抚摸音效 ${soundOn === true && soundOff === false ? 'PASS' : 'FAIL'} — 开=${soundOn}，关=${soundOff}`)
+    console.log(`[selftest] petting sound ${soundOn === true && soundOff === false ? 'PASS' : 'FAIL'} — on=${soundOn}, off=${soundOff}`)
 
     if (orig) {
       const pick = (o, ks) => ks.reduce((a, k) => (k in (o || {}) ? ((a[k] = o[k]), a) : a), {})
@@ -1705,7 +1710,7 @@ if (!gotLock) {
                 }
               }
               await settings.patch({ voice: { gptsovits: g } })
-              console.log(`[gptsovits] 已自动配置：${scan.root}`)
+              console.log(`[gptsovits] auto-configured: ${scan.root}`)
             }
           }
 
@@ -1714,7 +1719,7 @@ if (!gotLock) {
           if (res.ok) sendToRenderer({ type: 'gptsovits:ready', message: res.message })
           else sendToRenderer({ type: 'gptsovits:error', message: res.message })
         } catch (e) {
-          console.log('[gptsovits] 自动启动失败:', e.message)
+          console.log('[gptsovits] auto-start failed:', e.message)
         }
       }, 2500)
     }

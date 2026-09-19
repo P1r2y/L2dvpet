@@ -44,7 +44,7 @@ export class ChatPanel {
       else if (a === 'chat-clear') {
         this.chat.clear()
         this.clear()
-        this.addMessage('system', '对话记录已清空')
+        this.addMessage('system', 'Chat history cleared')
       } else if (a === 'chat-settings') bus.emit('ui:open-settings', { tab: 'chat' })
       else if (a === 'record-cancel') this.voice.stopRecording({ cancel: true })
     })
@@ -125,10 +125,10 @@ export class ChatPanel {
       if (state === 'recording') {
         this.micBtn.classList.add('recording')
         this.recordHint.classList.remove('hidden')
-        this.recordText.textContent = `正在聆听…（最长 ${maxSeconds || 30} 秒）`
+        this.recordText.textContent = `Listening… (up to ${maxSeconds || 30}s)`
       } else if (state === 'transcribing') {
         this.micBtn.classList.remove('recording')
-        this.recordText.textContent = '正在识别…'
+        this.recordText.textContent = 'Transcribing…'
       } else {
         this.micBtn.classList.remove('recording')
         this.recordHint.classList.add('hidden')
@@ -228,7 +228,7 @@ export class ChatPanel {
       { class: `msg ${role}` },
       role === 'system' || role === 'error'
         ? null
-        : el('div', { class: 'msg-emotion', text: `${role === 'user' ? '你' : this.personaName()} · ${formatClock()}` }),
+        : el('div', { class: 'msg-emotion', text: `${role === 'user' ? 'You' : this.personaName()} · ${formatClock()}` }),
       el('div', { class: 'msg-body', text: String(text || '') })
     )
     this.log.appendChild(node)
@@ -238,7 +238,7 @@ export class ChatPanel {
   }
 
   personaName() {
-    return this.getSettings()?.chat?.personaName || '助手'
+    return this.getSettings()?.chat?.personaName || 'Assistant'
   }
 
   beginStream() {
@@ -285,7 +285,7 @@ export class ChatPanel {
     this.clear()
     const items = Array.isArray(history) ? history.slice(-30) : []
     if (!items.length) {
-      this.addMessage('system', '还没有聊天记录，试着和我打个招呼吧～')
+      this.addMessage('system', 'No messages yet — say hi to get started.')
       return
     }
     for (const m of items) {
@@ -308,7 +308,7 @@ export class ChatPanel {
 
   async toggleRecord() {
     if (!this.getSettings()?.voice?.sttEnabled) {
-      toastErr('语音输入已在设置中关闭')
+      toastErr('Voice input is disabled in settings')
       return
     }
     if (this.voice.recording) await this.voice.stopRecording()

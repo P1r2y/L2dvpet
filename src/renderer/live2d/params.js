@@ -2,7 +2,7 @@
  * Parameter contract for models produced by **psd2live**.
  *
  * Source of truth: `psd2live/docs/zh/spec/DEFORMER_AND_PARAMETER_SPEC.md`
- * ("Cubism 标准参数清单与映射表") and `core/MotionGenerator.kt`.
+ * ("Cubism standard parameter list and mapping table") and `core/MotionGenerator.kt`.
  *
  * Two things matter to the runtime:
  *
@@ -118,56 +118,56 @@ export const GENERATED_MOTIONS = {
 export const PARAM_CATALOG = [
   {
     group: 'ParamGroupFace',
-    label: '面部',
+    label: 'Face',
     params: [
-      { id: 'ParamAngleX', name: '角度 X', owner: '动作曲线 + 视线（叠加）' },
-      { id: 'ParamAngleY', name: '角度 Y', owner: '动作曲线 + 视线（叠加）' },
-      { id: 'ParamAngleZ', name: '角度 Z', owner: 'idle 摇摆 ±2° + 视线侧倾' },
+      { id: 'ParamAngleX', name: 'Angle X', owner: 'Motion curves + gaze (additive)' },
+      { id: 'ParamAngleY', name: 'Angle Y', owner: 'Motion curves + gaze (additive)' },
+      { id: 'ParamAngleZ', name: 'Angle Z', owner: 'Idle sway ±2° + gaze roll' },
     ],
   },
   {
     group: 'ParamGroupEyes',
-    label: '眼睛',
+    label: 'Eyes',
     params: [
-      { id: 'ParamEyeLOpen', name: '左眼开合', owner: '眨眼 × 动作曲线' },
-      { id: 'ParamEyeROpen', name: '右眼开合', owner: '眨眼 × 动作曲线' },
-      { id: 'ParamEyeBallX', name: '眼球 X', owner: '视线跟随' },
-      { id: 'ParamEyeBallY', name: '眼球 Y', owner: '视线跟随' },
-      { id: 'ParamEyeBallForm', name: '果冻眼', owner: '物理 PhysicsEyeJelly（scale 0.32）' },
+      { id: 'ParamEyeLOpen', name: 'Eye L open', owner: 'Blink × motion curves' },
+      { id: 'ParamEyeROpen', name: 'Eye R open', owner: 'Blink × motion curves' },
+      { id: 'ParamEyeBallX', name: 'Eye ball X', owner: 'Gaze tracking' },
+      { id: 'ParamEyeBallY', name: 'Eye ball Y', owner: 'Gaze tracking' },
+      { id: 'ParamEyeBallForm', name: 'Jelly eye', owner: 'Physics PhysicsEyeJelly (scale 0.32)' },
     ],
   },
   {
     group: 'ParamGroupBrows',
-    label: '眉毛',
+    label: 'Brows',
     params: [
-      { id: 'ParamBrowLY', name: '左眉 Y', owner: '情绪' },
-      { id: 'ParamBrowRY', name: '右眉 Y', owner: '情绪' },
+      { id: 'ParamBrowLY', name: 'Brow L Y', owner: 'Emotion' },
+      { id: 'ParamBrowRY', name: 'Brow R Y', owner: 'Emotion' },
     ],
   },
   {
     group: 'ParamGroupMouth',
-    label: '嘴巴',
+    label: 'Mouth',
     params: [
-      { id: 'ParamMouthForm', name: '嘴型', owner: '情绪（微笑 / 悲伤）' },
-      { id: 'ParamMouthOpenY', name: '嘴巴开合', owner: '语音口型同步' },
+      { id: 'ParamMouthForm', name: 'Mouth form', owner: 'Emotion (smile / sad)' },
+      { id: 'ParamMouthOpenY', name: 'Mouth open', owner: 'Voice lip-sync' },
     ],
   },
   {
     group: 'ParamGroupBody',
-    label: '身体',
+    label: 'Body',
     params: [
-      { id: 'ParamBodyAngleX', name: '身体 X', owner: 'idle ∓1.2° + 视线（叠加）' },
-      { id: 'ParamBodyAngleY', name: '身体 Y', owner: 'nod 动作 ∓4° + 视线（叠加）' },
-      { id: 'ParamBodyAngleZ', name: '身体 Z', owner: '情绪侧倾' },
-      { id: 'ParamBreath', name: '呼吸', owner: 'idle 曲线 0↔1' },
+      { id: 'ParamBodyAngleX', name: 'Body X', owner: 'Idle ∓1.2° + gaze (additive)' },
+      { id: 'ParamBodyAngleY', name: 'Body Y', owner: 'Nod motion ∓4° + gaze (additive)' },
+      { id: 'ParamBodyAngleZ', name: 'Body Z', owner: 'Emotion roll' },
+      { id: 'ParamBreath', name: 'Breath', owner: 'Idle curve 0↔1' },
     ],
   },
   {
     group: 'ParamGroupPhysics',
-    label: '物理',
+    label: 'Physics',
     params: [
-      { id: 'ParamHairFront', name: '前发摆动', owner: '物理 PhysicsHairFront（1.522）' },
-      { id: 'ParamHairBack', name: '后发摆动', owner: '物理 PhysicsHairBack（2.061）' },
+      { id: 'ParamHairFront', name: 'Hair front sway', owner: 'Physics PhysicsHairFront (1.522)' },
+      { id: 'ParamHairBack', name: 'Hair back sway', owner: 'Physics PhysicsHairBack (2.061)' },
     ],
   },
 ]

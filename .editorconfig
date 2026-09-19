@@ -1,5 +1,5 @@
-# 本项目源码统一使用 UTF-8 + LF + 2 空格缩进。
-# 换行已由 .gitattributes（eol=lf）强制，此处为编辑器内的实时约定。
+# All source in this project uses UTF-8 + LF + 2-space indent.
+# Line endings are enforced by .gitattributes (eol=lf); this is the live convention inside editors.
 root = true
 
 [*]
@@ -10,6 +10,6 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# Markdown 不裁掉行尾空格（Markdown 里两个空格 = 换行）
+# Markdown keeps trailing whitespace (two trailing spaces in Markdown = a line break)
 [*.md]
 trim_trailing_whitespace = false

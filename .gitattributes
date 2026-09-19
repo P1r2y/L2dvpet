@@ -1,8 +1,9 @@
-# 本仓库所有文本文件均以 LF 存储与检出（经 byte 级普查确认，无 CRLF、无混合）。
-# eol=lf 让各平台检出结果一致，避免换行造成的无意义 diff。
+# Every text file in this repo is stored and checked out with LF (verified byte by byte:
+# no CRLF, no mixed endings).
+# eol=lf makes checkouts identical on every platform and avoids pointless line-ending diffs.
 * text=auto eol=lf
 
-# 二进制资源：禁止换行转换与文本 diff
+# Binary assets: no newline conversion and no text diff
 *.png    binary
 *.jpg    binary
 *.jpeg   binary
@@ -13,7 +14,7 @@
 *.psd    binary
 *.zip    binary
 
-# 构建产物与第三方库不计入语言统计
+# Build output and third-party libraries are excluded from language stats
 dist/**                    linguist-generated=true
 dist/vendor/**             linguist-vendored=true
 vendor/**                  linguist-vendored=true

@@ -31,9 +31,9 @@ async function transcribe(settings, audio) {
   const model = v.sttModel || 'whisper-1'
   const language = audio.language || v.sttLanguage || ''
 
-  if (!audio || !audio.base64) throw new Error('没有录到声音')
+  if (!audio || !audio.base64) throw new Error('No audio was recorded')
   const buffer = Buffer.from(audio.base64, 'base64')
-  if (buffer.length < 1200) throw new Error('录音太短了，再说一次吧')
+  if (buffer.length < 1200) throw new Error('Recording too short — say it again')
 
   const url = resolveEndpoint(baseUrl, '/audio/transcriptions')
   const ext = pickExtension(audio.mime)
@@ -57,8 +57,8 @@ async function transcribe(settings, audio) {
     })
   } catch (err) {
     clearTimeout(timer)
-    if (err.name === 'AbortError') throw new Error('语音识别超时')
-    throw new Error(`语音识别请求失败: ${err.message}`)
+    if (err.name === 'AbortError') throw new Error('Speech recognition timed out')
+    throw new Error(`Speech recognition request failed: ${err.message}`)
   }
   clearTimeout(timer)
 
@@ -71,13 +71,13 @@ async function transcribe(settings, audio) {
     } catch {
       /* raw */
     }
-    const hint = res.status === 401 ? '（API Key 无效）' : res.status === 404 ? '（地址或模型名错误）' : ''
-    throw new Error(`语音识别失败 HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
+    const hint = res.status === 401 ? ' (invalid API key)' : res.status === 404 ? ' (wrong endpoint or model name)' : ''
+    throw new Error(`Transcription failed HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
   }
 
   const json = await res.json().catch(async () => ({ text: await res.text().catch(() => '') }))
   const text = String(json.text ?? json.result ?? json.data?.text ?? '').trim()
-  if (!text) throw new Error('没有识别出内容，换个说法试试？')
+  if (!text) throw new Error('Nothing was recognized — try rephrasing?')
   return { text, provider: 'openai-compatible' }
 }
 

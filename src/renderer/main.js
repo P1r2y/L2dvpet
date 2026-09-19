@@ -77,7 +77,7 @@ async function boot() {
   }
 
   try {
-    setProgress('正在读取设置…')
+    setProgress('Reading settings…')
     const [settings, state, defaults] = await Promise.all([
       bridge.settings.get(),
       bridge.state.get(),
@@ -102,17 +102,18 @@ async function boot() {
         onProgress: setProgress,
       })
     } catch (err) {
-      // 模型是自备素材：仓库里不带，所以「没模型 / 路径写错」是最常见的首次启动状况，
-      // 这里把原始报错（多半只是一句 fetch 失败）换成能照着做的提示。
+      // The model is a bring-your-own asset that the repo does not ship, so "no model /
+      // wrong path" is the most common first-run state. The raw error (usually a bare
+      // fetch failure) is swapped for a message the user can act on.
       const p = String(settings.model.path || '').trim()
       throw new Error(
         p
-          ? `加载 Live2D 模型失败：${p}（${err?.message || err}）。请在「设置 → 显示 → 模型路径」里改成一个存在的 .model3.json。`
-          : '还没有指定 Live2D 模型。请在「设置 → 显示 → 模型路径」里填上你自己的 .model3.json 路径。'
+          ? `Failed to load the Live2D model: ${p} (${err?.message || err}). Point Settings → Display → Model path at an existing .model3.json.`
+          : 'No Live2D model is set yet. Fill in the path to your own .model3.json under Settings → Display → Model path.'
       )
     }
 
-    setProgress('准备就绪')
+    setProgress('Ready')
     pet.applySettings(app.settings)
 
     /* controllers ---------------------------------------------------- */
@@ -162,7 +163,7 @@ async function boot() {
       chat: app.chat,
       voice: app.voice,
       getParamRanges: () => app.pet?.paramRanges || {},
-      /** Live parameter tracing — only runs while the 模型参数 section is open. */
+      /** Live parameter tracing — only runs while the Model parameters section is open. */
       setTrace: (on) => {
         app.pet.setTracing(on)
         app.pet._captureApplied = !!on
@@ -204,7 +205,7 @@ async function boot() {
     // Startup greeting
     if (app.settings.chat.autoGreeting) {
       setTimeout(() => {
-        const greet = app.settings.chat.greeting || '你好呀～'
+        const greet = app.settings.chat.greeting || 'Hi there~'
         app.bubble.show(greet, { actions: true, duration: 12 })
         app.pet.setEmotion('happy', 4000)
         if (app.settings.voice.ttsEnabled && app.settings.voice.autoSpeak) {
@@ -299,7 +300,7 @@ async function boot() {
         sfxPat: (strength = 0.6) => !!app.sfx?.pat(strength, { minGapMs: 0 }),
         /** Simulates the petting state without a real mouse drag. */
         petVisual: (on, head = true) => app.pet.setPettingVisual(!!on, { head: !!head }),
-        /** Which group the library will auto-play next — the 播放动作 switch. */
+        /** Which group the library will auto-play next — the Play motions switch. */
         idleMotionGroup: () => app.pet.stage?.model?.internalModel?.motionManager?.groups?.idle ?? null,
         /** Whether the quick dock is currently suppressed. */
         dockHidden: () => !!document.getElementById('dock')?.classList.contains('hidden'),
@@ -656,10 +657,10 @@ async function boot() {
               // Probe the synthesis layer directly so a playback failure can be
               // told apart from a synthesis failure.
               const probe = await bridge.tts
-                .speak({ text: '测试一下声线的变化，一二三四五。' })
+                .speak({ text: 'Testing the voice change — one, two, three, four, five.' })
                 .catch((e) => ({ kind: 'throw', message: e.message }))
 
-              const ok = await app.voice.speak('测试一下声线的变化，一二三四五。', { force: true })
+              const ok = await app.voice.speak('Testing the voice change — one, two, three, four, five.', { force: true })
               for (let i = 0; i < 25 && !(app.voice.audio?.duration > 0); i++) {
                 await new Promise((r) => setTimeout(r, 60))
               }
@@ -809,9 +810,9 @@ async function boot() {
          * End-to-end GPT-SoVITS check: detect the install, apply the found
          * configuration, speak, and report which engine actually produced audio.
          */
-        testGptsovits: async (text = '你好，这是当前音色的试听。') => {
+        testGptsovits: async (text = 'Hello, this is a preview of the current voice.') => {
           const scan = await bridge.tts.scanGptsovits({})
-          if (!scan?.root) return { ok: false, step: 'scan', message: '未找到 GPT-SoVITS 安装目录' }
+          if (!scan?.root) return { ok: false, step: 'scan', message: 'GPT-SoVITS install directory not found' }
 
           const g = {
             root: scan.root,
@@ -842,7 +843,7 @@ async function boot() {
 
           const status = await app.voice.engineStatus().catch(() => null)
           if (!status?.gptsovitsAvailable) {
-            return { ok: false, step: 'probe', message: 'GPT-SoVITS 服务未运行', root: scan.root, config: g }
+            return { ok: false, step: 'probe', message: 'GPT-SoVITS service is not running', root: scan.root, config: g }
           }
 
           app.voice.stop()
@@ -881,8 +882,8 @@ async function boot() {
     console.error('[app] boot failed', err)
     loading.classList.remove('done')
     loading.querySelector('.loading-card')?.classList.add('error')
-    setProgress('启动失败', String(err?.message || err))
-    toastErr(`启动失败：${err?.message || err}`, 12000)
+    setProgress('Startup failed', String(err?.message || err))
+    toastErr(`Startup failed: ${err?.message || err}`, 12000)
   }
 }
 
@@ -912,7 +913,7 @@ function applyTheme() {
   if (ui.fontSize) root.style.setProperty('--fs', `${ui.fontSize}px`)
   if (ui.panelOpacity) {
     const o = clamp(Number(ui.panelOpacity), 0.3, 1)
-    /* 与 VS Code 编辑器底色 (#1e1e1e) 同色，只让不透明度可调。 */
+    /* Same colour as the VS Code editor background (#1e1e1e): only the opacity is adjustable. */
     root.style.setProperty('--panel-bg', `rgba(30, 30, 30, ${o})`)
   }
 }
@@ -931,7 +932,7 @@ function wireDock() {
     await patchSettings({ voice: { ttsEnabled: on } })
     updateDockSpeakIcon()
     if (!on) app.voice.stop()
-    toastOk(on ? '语音朗读已开启' : '语音朗读已关闭')
+    toastOk(on ? 'Voice reading on' : 'Voice reading off')
   })
 }
 
@@ -973,7 +974,7 @@ function wireBus() {
   /* ---- petting: hearts appear while stroking the head, and only then ---- */
   bus.on('input:pet-start', ({ head }) => {
     app.lastPetAt = performance.now()
-    // 抚摸音效: one soft pat as the hand lands, then the stroke handler keeps a
+    // Petting sound: one soft pat as the hand lands, then the stroke handler keeps a
     // gentle rhythm going.
     if (head) app.sfx?.pat(0.7, { minGapMs: 0 })
     const lines = app.settings.petting.greetLines || []
@@ -1030,15 +1031,15 @@ function wireBus() {
   /* ---- context menu ---- */
   bus.on('input:context-menu', ({ x, y }) => {
     app.menu.show(x, y, [
-      { label: '开始聊天', icon: '💬', action: () => app.chatPanel.open() },
-      { label: app.settings.voice.sttEnabled ? '语音输入' : '语音输入（已关闭）', icon: '🎤', action: () => app.chatPanel.toggleRecord() },
+      { label: 'Start chatting', icon: '💬', action: () => app.chatPanel.open() },
+      { label: app.settings.voice.sttEnabled ? 'Voice input' : 'Voice input (off)', icon: '🎤', action: () => app.chatPanel.toggleRecord() },
       { type: 'sep' },
-      { label: '让她点头', icon: '🙂', action: () => app.pet.react('nod') },
-      { label: '让她摇头', icon: '🙅', action: () => app.pet.react('shake') },
-      { label: '摸摸头', icon: '💗', action: () => app.pet.react('love') },
+      { label: 'Make her nod', icon: '🙂', action: () => app.pet.react('nod') },
+      { label: 'Make her shake her head', icon: '🙅', action: () => app.pet.react('shake') },
+      { label: 'Head pat', icon: '💗', action: () => app.pet.react('love') },
       { type: 'sep' },
       {
-        label: app.settings.voice.ttsEnabled ? '关闭语音朗读' : '开启语音朗读',
+        label: app.settings.voice.ttsEnabled ? 'Turn voice reading off' : 'Turn voice reading on',
         icon: '🔊',
         action: async () => {
           await patchSettings({ voice: { ttsEnabled: !app.settings.voice.ttsEnabled } })
@@ -1047,20 +1048,20 @@ function wireBus() {
         },
       },
       {
-        label: '鼠标穿透',
+        label: 'Click-through',
         icon: '🖱',
         checked: app.overrideClickThrough,
         action: () => {
           app.overrideClickThrough = !app.overrideClickThrough
           bridge.win.setIgnoreMouse(app.overrideClickThrough)
-          toast(app.overrideClickThrough ? '已开启鼠标穿透（从托盘可恢复）' : '已恢复鼠标交互', '', 4000)
+          toast(app.overrideClickThrough ? 'Click-through on (restore from the tray)' : 'Mouse interaction restored', '', 4000)
         },
       },
       { type: 'sep' },
-      { label: '设置…', icon: '⚙️', key: 'Ctrl+Shift+S', action: () => app.settingsPanel.open() },
-      { label: '让她待机（隐藏）', icon: '👁', key: 'Ctrl+Shift+H', action: () => bridge.win.hide() },
+      { label: 'Settings…', icon: '⚙️', key: 'Ctrl+Shift+S', action: () => app.settingsPanel.open() },
+      { label: 'Let her idle (hide)', icon: '👁', key: 'Ctrl+Shift+H', action: () => bridge.win.hide() },
       { type: 'sep' },
-      { label: '退出', icon: '🚪', danger: true, action: () => bridge.win.quit() },
+      { label: 'Quit', icon: '🚪', danger: true, action: () => bridge.win.quit() },
     ])
   })
 
@@ -1072,7 +1073,7 @@ function wireBus() {
 
   bus.on('chat:start', () => {
     app.pet.setEmotion('think', 20000)
-    if (!app.chatPanel.visible) app.bubble.show('嗯…让我想想～', { duration: 0, keep: true })
+    if (!app.chatPanel.visible) app.bubble.show('Hmm… let me think~', { duration: 0, keep: true })
   })
 
   bus.on('chat:delta', ({ full }) => {
@@ -1103,7 +1104,7 @@ function wireBus() {
   })
 
   bus.on('chat:error', () => app.pet.setEmotion('sad', 3500))
-  bus.on('chat:cleared', () => toastOk('对话记录已清空'))
+  bus.on('chat:cleared', () => toastOk('Chat history cleared'))
 
   // ChatService mutates its own view of state; mirror it to disk so the
   // conversation (and stats) survive a restart.
@@ -1112,15 +1113,15 @@ function wireBus() {
   /* ---- voice ---- */
   bus.on('voice:error', ({ message }) => toastErr(message, 6000))
   bus.on('voice:fallback', ({ label, from, to }) => {
-    const names = { gptsovits: 'GPT-SoVITS', openai: '在线 TTS' }
-    toast(label || `${names[from] || from} 不可用，已改用${names[to] || to}`, 'err', 6000)
+    const names = { gptsovits: 'GPT-SoVITS', openai: 'Online TTS' }
+    toast(label || `${names[from] || from} unavailable — switched to ${names[to] || to}`, 'err', 6000)
     updateDockSpeakIcon()
   })
   bus.on('voice:lang-mismatch', ({ lang }) => {
-    const pretty = { 'ja-JP': '日语', 'en-US': '英语', 'ko-KR': '韩语', 'zh-CN': '中文' }[lang] || lang
+    const pretty = { 'ja-JP': 'Japanese', 'en-US': 'English', 'ko-KR': 'Korean', 'zh-CN': 'Chinese' }[lang] || lang
     toast(
-      `本机没有可用的${pretty}语音引擎，这段${pretty}内容会用现有音色朗读（音色/发音可能不准）。` +
-        `想要${pretty}音色：让 GPT-SoVITS 服务保持运行，或配置一个支持该语言的在线 TTS 接口。`,
+      `This machine has no ${pretty} speech engine, so ${pretty} text is read with the current voice (timbre and pronunciation may be off). ` +
+        `For a ${pretty} voice: keep the GPT-SoVITS service running, or point an online TTS endpoint at a model that supports the language.`,
       'err',
       9000
     )
@@ -1140,7 +1141,7 @@ function wireBus() {
     app.dock?.setEnabled(app.settings?.ui?.dockVisible !== false)
     applyTheme()
     updateDockSpeakIcon()
-    toastOk('已恢复默认设置')
+    toastOk('Defaults restored')
   })
 
   /* ---- internal UI commands ---- */
@@ -1164,10 +1165,10 @@ function wireBus() {
     const g = app.pet.gaze.output
     app.statusEl.textContent =
       `FPS ${String(app.pet.fps).padStart(3)}  ${app.settings.display.fps}cap\n` +
-      `情绪 ${app.pet.emotion.current}\n` +
-      `眼球 ${g.eyeX >= 0 ? '+' : ''}${g.eyeX.toFixed(2)} ${g.eyeY >= 0 ? '+' : ''}${g.eyeY.toFixed(2)}\n` +
-      `头部 ${g.headX >= 0 ? '+' : ''}${g.headX.toFixed(1)}° ${g.headY >= 0 ? '+' : ''}${g.headY.toFixed(1)}°\n` +
-      `互动 ${app.interaction.overModel ? '抚摸中' : app.interaction.overUI ? 'UI' : '穿透'}`
+      `Emotion ${app.pet.emotion.current}\n` +
+      `Eyes ${g.eyeX >= 0 ? '+' : ''}${g.eyeX.toFixed(2)} ${g.eyeY >= 0 ? '+' : ''}${g.eyeY.toFixed(2)}\n` +
+      `Head ${g.headX >= 0 ? '+' : ''}${g.headX.toFixed(1)}° ${g.headY >= 0 ? '+' : ''}${g.headY.toFixed(1)}°\n` +
+      `Interaction ${app.interaction.overModel ? 'petting' : app.interaction.overUI ? 'UI' : 'click-through'}`
   }, 250)
 
   /* ---- periodic HUD tracking ---- */
@@ -1207,7 +1208,7 @@ function wireMainCommands() {
         break
       case 'click-through-override':
         app.overrideClickThrough = !!cmd.value
-        toast(cmd.value ? '已开启鼠标穿透，点击将穿过桌宠' : '已恢复鼠标交互', '', 3500)
+        toast(cmd.value ? 'Click-through on — clicks pass through the pet' : 'Mouse interaction restored', '', 3500)
         break
       case 'settings-changed-externally':
         app.settings = cmd.settings

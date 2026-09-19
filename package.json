@@ -2,7 +2,7 @@
   "name": "ai-computer-pet",
   "version": "1.0.0",
   "private": true,
-  "description": "Live2D 桌面宠物 — 视线跟随 / 对话 / 抚摸 / 语音 / 设置面板",
+  "description": "Live2D desktop pet — gaze tracking / chat / petting / voice / settings panel",
   "main": "src/main/main.cjs",
   "scripts": {
     "build": "node scripts/build.mjs",

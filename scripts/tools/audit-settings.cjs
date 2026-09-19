@@ -1,18 +1,22 @@
 'use strict'
 /**
- * 设置落实审计 — 列出每个设置字段的消费者，并标出可疑的那些。
+ * Settings wiring audit — lists the consumer of every settings field and flags
+ * the suspicious ones.
  *
  *   node scripts/tools/audit-settings.cjs
  *
- * 为什么需要它：设置面板里一个开关「存在」不代表它「有用」。曾经有两个开关
- * （显示托盘图标 / 显示快捷按钮条）在 UI 和 defaults 里都在，代码里却从没人读；
- * 另一个（舒服地眯眼）被读了，但读它去触发一次无关的反应，真正的持续眯眼是硬编码
- * 的常量 —— 静态检查只能查到前者那一类，所以这里同时把「只在注释/字符串里出现过」
- * 的引用单独标出来，那种引用不是消费者。
+ * Why it exists: a toggle "being there" in the settings panel does not mean it
+ * "does anything". Two toggles (show tray icon / show shortcut dock) once
+ * existed in both the UI and defaults while nobody read them in code; another
+ * one (comfortable squint) was read, but reading it fired an unrelated reaction
+ * while the real sustained squint was a hard-coded constant. A static check only
+ * catches the former kind, so references that show up in comments/strings only
+ * are listed separately — that kind of reference is not a consumer.
  *
- * 局限（写清楚免得误信）：本工具证明的是「这个字段被代码读到了」，证明不了
- * 「读到的值真的改变了行为」。后者只能靠运行时断言，见自测里的「抚摸·眯眼」
- * 「开关落实」等条目。
+ * Limitation (spelled out so it is not over-trusted): this tool proves "the
+ * field is read by code", not "the value read actually changed behaviour". Only
+ * a runtime assertion can show the latter — see the "petting·squint" and
+ * "settings wiring" entries in the self-test.
  */
 const fs = require('node:fs')
 const path = require('node:path')
@@ -20,7 +24,7 @@ const path = require('node:path')
 const ROOT = path.resolve(__dirname, '..', '..')
 const SCHEMA = path.join(ROOT, 'src', 'renderer', 'ui', 'settings', 'schema.js')
 
-/** 剥掉注释；字符串字面量保留（第二遍再剥，用来区分「只在字符串里出现」）。 */
+/** Strips comments; string literals survive (a second pass strips them, so "string-only" references can be told apart). */
 function stripComments(src) {
   let out = ''
   let state = null
@@ -63,7 +67,7 @@ function stripComments(src) {
   return out
 }
 
-/** 再把字符串字面量剥掉，得到一个「只剩代码」的版本。 */
+/** Then strips the string literals too, leaving a code-only version. */
 function stripStrings(src) {
   return src.replace(/'(?:[^'\\]|\\.)*'/g, "''").replace(/"(?:[^"\\]|\\.)*"/g, '""')
 }
@@ -86,7 +90,7 @@ for (const m of schemaSrc.matchAll(/\b(?:SW|NUM|TXT|SEL|AREA|RNG|LINES)\(\s*['"]
 
 const consumers = []
 for (const file of [...collectSources(path.join(ROOT, 'src')), ...collectSources(path.join(ROOT, 'scripts'))]) {
-  if (file === SCHEMA || file.endsWith('panel.js')) continue // 面板只是渲染，不算消费者
+  if (file === SCHEMA || file.endsWith('panel.js')) continue // the panel only renders, it is not a consumer
   const code = stripComments(fs.readFileSync(file, 'utf8'))
   consumers.push({ file: path.relative(ROOT, file), code, bare: stripStrings(code) })
 }
@@ -106,11 +110,11 @@ for (const key of keys) {
 
 const width = Math.max(...rows.map((r) => r.key.length))
 for (const r of rows) {
-  const mark = !r.anyRef.length ? '✗ 无消费者' : !r.strong.length ? '⚠ 只在注释/字符串里出现' : ''
-  console.log(`  ${r.key.padEnd(width)}  ${String(r.strong.length).padStart(2)} 处  ${mark}`)
+  const mark = !r.anyRef.length ? '✗ no consumer' : !r.strong.length ? '⚠ comments/strings only' : ''
+  console.log(`  ${r.key.padEnd(width)}  ${String(r.strong.length).padStart(2)} refs  ${mark}`)
 }
 
-console.log(`\n字段总数 ${keys.length}`)
-console.log(`  无消费者            ${dead.length}${dead.length ? `  ← ${dead.join(', ')}` : ''}`)
-console.log(`  只在注释/字符串里出现  ${weak.length}${weak.length ? `  ← ${weak.map((w) => w.key).join(', ')}` : ''}`)
-console.log('\n注意：本脚本只验证「被读到」，不验证「读到的值改变了行为」。')
+console.log(`\nTotal fields ${keys.length}`)
+console.log(`  no consumer                ${dead.length}${dead.length ? `  ← ${dead.join(', ')}` : ''}`)
+console.log(`  comments/strings only      ${weak.length}${weak.length ? `  ← ${weak.map((w) => w.key).join(', ')}` : ''}`)
+console.log('\nNote: this script only verifies "is read" — not "the value read changed behaviour".')

@@ -191,7 +191,7 @@ export class Pet {
     })
 
     /* blink ----------------------------------------------------------- */
-    // 舒服地眯眼 (设置 → 抚摸): the steady half-close that lasts as long as the
+    // Squint when petted (Settings → Petting): the steady half-close that lasts as long as the
     // stroking does. Off means the eyes stay open throughout.
     const squintOn = this.settings?.petting?.squint !== false
     const blinkScale = this.petting && squintOn ? 0.58 : 1
@@ -238,7 +238,7 @@ export class Pet {
   }
 
   /**
-   * Manual per-parameter overrides from 设置 → 模型参数.
+   * Manual per-parameter overrides from Settings → Model parameters.
    *
    * Modes:
    *  - `auto`   engine drives it; `min`/`max` (when set) clamp the result.
@@ -362,7 +362,7 @@ export class Pet {
    * The app's own eye-open factor: the blink curve times the current
    * expression's squint.
    *
-   * While the pet is being stroked, 设置 → 抚摸 → 舒服地眯眼 is authoritative:
+   * While the pet is being stroked, Settings → Petting → Squint when petted is authoritative:
    * with it off the eyes stay open whatever wants to narrow them — our blink
    * curve, the stroking squint, or the expression a pet reaction sets.
    */
@@ -381,7 +381,7 @@ export class Pet {
    * authored detail (the Nod curve presses the eyes to 0.75) *and* stays stable
    * when nothing rewrites the channel.
    *
-   * A pinned parameter is left alone — 固定 means fixed.
+   * A pinned parameter is left alone — "fixed" means fixed.
    */
   _writeEyeOpen(core, id, open) {
     if (this._isParamFixed(id)) return
@@ -579,7 +579,7 @@ export class Pet {
 
   /** Semantic reactions used by chat, petting and voice events. */
   react(kind) {
-    // 播放动作 is off: no motion may start, whatever asked for it.
+    // Play motions is off: no motion may start, whatever asked for it.
     if (this.settings?.idle?.motionsEnabled === false) return Promise.resolve(false)
     const groups = this.stage.getUsableMotionGroups()
     const has = (g) => groups.some((x) => x.toLowerCase() === g.toLowerCase())

@@ -7,7 +7,7 @@
 /** Accepts base ("https://api.x.com/v1") or full endpoint URLs. */
 function resolveEndpoint(baseUrl, suffix) {
   let base = String(baseUrl || '').trim().replace(/\/+$/, '')
-  if (!base) throw new Error('API 地址为空，请在设置面板中填写')
+  if (!base) throw new Error('API base URL is empty — fill it in the settings panel')
   if (!/^https?:\/\//i.test(base)) base = `https://${base}`
   if (base.endsWith(suffix)) return base
   return `${base}${suffix}`
@@ -73,7 +73,7 @@ async function* streamChat(cfg, messages, signal) {
     const text = await res.text().catch(() => '')
     throw new Error(httpError(res.status, text, url))
   }
-  if (!res.body) throw new Error('服务端未返回响应流')
+  if (!res.body) throw new Error('Server returned no response stream')
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder('utf-8')
@@ -181,16 +181,16 @@ function httpError(status, bodyText, url) {
   detail = String(detail || '').slice(0, 500)
   const hint =
     status === 401
-      ? '（API Key 无效或未填写）'
+      ? ' (invalid or missing API key)'
       : status === 404
-        ? '（接口地址或模型名不存在，请检查 Base URL 是否包含 /v1）'
+        ? ' (endpoint or model does not exist — check that the base URL includes /v1)'
         : status === 429
-          ? '（请求过于频繁或余额不足）'
+          ? ' (too many requests, or out of credit)'
           : ''
-  return `请求失败 HTTP ${status}${hint}: ${detail || url}`
+  return `Request failed HTTP ${status}${hint}: ${detail || url}`
 }
 
-/** Non-streaming request, used by the "测试连接" button. */
+/** Non-streaming request, used by the "test connection" button. */
 async function chatOnce(cfg, messages, signal) {
   const url = resolveEndpoint(cfg.baseUrl, '/chat/completions')
   const res = await fetch(url, {

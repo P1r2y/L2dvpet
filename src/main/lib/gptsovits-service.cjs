@@ -78,7 +78,7 @@ async function ensureRunning(settings, log = () => {}) {
   const { host, port } = parseHostPort(cfg.baseUrl)
 
   if (await portOpen(host, port)) {
-    return { ok: true, started: false, alreadyRunning: true, message: `服务已在 ${host}:${port} 运行` }
+    return { ok: true, started: false, alreadyRunning: true, message: `Service already running on ${host}:${port}` }
   }
 
   const script = launcherFor(cfg.root)
@@ -87,7 +87,7 @@ async function ensureRunning(settings, log = () => {}) {
       ok: false,
       started: false,
       alreadyRunning: false,
-      message: '未找到 GPT-SoVITS 的 api_v2.py（设置 → 语音 → GPT-SoVITS → 自动检测）',
+      message: 'api_v2.py not found in the GPT-SoVITS install (Settings → Voice → GPT-SoVITS → auto-detect)',
     }
   }
 
@@ -109,18 +109,18 @@ async function ensureRunning(settings, log = () => {}) {
     })
     child.unref()
   } catch (err) {
-    return { ok: false, started: false, alreadyRunning: false, message: `启动失败：${err.message}` }
+    return { ok: false, started: false, alreadyRunning: false, message: `Failed to start: ${err.message}` }
   }
 
   // Wait for the port to come up — v2ProPlus needs a while to load weights.
   const deadline = Date.now() + 180000
   while (Date.now() < deadline) {
     if (await portOpen(host, port, 1000)) {
-      return { ok: true, started: true, alreadyRunning: false, message: `GPT-SoVITS 已启动（${host}:${port}）` }
+      return { ok: true, started: true, alreadyRunning: false, message: `GPT-SoVITS started (${host}:${port})` }
     }
     await new Promise((r) => setTimeout(r, 1500))
   }
-  return { ok: false, started: true, alreadyRunning: false, message: '已拉起进程，但 180 秒内端口仍未就绪' }
+  return { ok: false, started: true, alreadyRunning: false, message: 'Process launched, but the port was still not ready after 180 s' }
 }
 
 module.exports = { ensureRunning, portOpen, launcherFor, parseHostPort }

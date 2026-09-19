@@ -79,7 +79,7 @@ export function cleanForSpeech(text) {
   return String(text || '')
     .replace(/\[[^\]]{1,24}\]/g, '') // strip [emotion] / [motion:x] tags
     .replace(/[*_`~#>|]/g, '')
-    .replace(/https?:\/\/\S+/g, '链接')
+    .replace(/https?:\/\/\S+/g, 'link')
     .replace(/\s*\n+\s*/g, '，')
     .replace(/[，。！？、；：]{2,}/g, (m) => m[0])
     .replace(/\s{2,}/g, ' ')

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <!--
@@ -12,7 +12,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline' 'unsafe-eval'; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data: blob:; media-src 'self' app: data: blob:; connect-src 'self' app: data: blob:; font-src 'self' app: data:; object-src 'none'; base-uri 'none';"
     />
-    <title>桌面小精灵</title>
+    <title>Live2D Desktop Pet</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -30,8 +30,8 @@
           <div class="bubble-tail"></div>
         </div>
         <div id="bubble-actions" class="bubble-actions hidden">
-          <button class="bubble-btn" data-bubble-action="speak" title="重新朗读">🔊</button>
-          <button class="bubble-btn" data-bubble-action="close" title="关闭">✕</button>
+          <button class="bubble-btn" data-bubble-action="speak" title="Speak again">🔊</button>
+          <button class="bubble-btn" data-bubble-action="close" title="Close">✕</button>
         </div>
       </div>
 
@@ -40,26 +40,26 @@
 
       <!-- ── Quick dock ─────────────────────────────────────────── -->
       <div id="dock" class="dock hidden">
-        <button class="dock-btn" data-action="chat" title="打开对话 (C)"><span>💬</span></button>
-        <button class="dock-btn" data-action="mic" title="按住说话 / 点击切换 (M)"><span>🎤</span></button>
-        <button class="dock-btn" data-action="speak-toggle" title="语音开关">
+        <button class="dock-btn" data-action="chat" title="Open chat (C)"><span>💬</span></button>
+        <button class="dock-btn" data-action="mic" title="Hold to talk / click to toggle (M)"><span>🎤</span></button>
+        <button class="dock-btn" data-action="speak-toggle" title="Voice on/off">
           <span id="dock-speak-icon">🔈</span>
         </button>
-        <button class="dock-btn" data-action="settings" title="设置 (S)"><span>⚙️</span></button>
-        <button class="dock-btn" data-action="hide" title="隐藏桌宠 (Ctrl+Shift+H)"><span>👁</span></button>
+        <button class="dock-btn" data-action="settings" title="Settings (S)"><span>⚙️</span></button>
+        <button class="dock-btn" data-action="hide" title="Hide pet (Ctrl+Shift+H)"><span>👁</span></button>
       </div>
 
       <!-- ── Chat panel ─────────────────────────────────────────── -->
-      <section id="chat-panel" class="panel chat-panel hidden" aria-label="对话">
+      <section id="chat-panel" class="panel chat-panel hidden" aria-label="Chat">
         <header class="panel-head" data-drag-handle="chat">
           <div class="panel-title">
             <span class="avatar-dot"></span>
-            <span id="chat-title">对话</span>
+            <span id="chat-title">Chat</span>
           </div>
           <div class="panel-head-actions">
-            <button class="icon-btn" data-action="chat-clear" title="清空对话">🗑</button>
-            <button class="icon-btn" data-action="chat-settings" title="对话设置">⚙</button>
-            <button class="icon-btn" data-action="chat-close" title="关闭">✕</button>
+            <button class="icon-btn" data-action="chat-clear" title="Clear chat">🗑</button>
+            <button class="icon-btn" data-action="chat-settings" title="Chat settings">⚙</button>
+            <button class="icon-btn" data-action="chat-close" title="Close">✕</button>
           </div>
         </header>
 
@@ -70,8 +70,8 @@
         </div>
 
         <div id="chat-record-hint" class="record-hint hidden">
-          <span class="rec-dot"></span><span id="record-text">正在聆听…</span>
-          <button class="mini-btn" data-action="record-cancel">取消</button>
+          <span class="rec-dot"></span><span id="record-text">Listening…</span>
+          <button class="mini-btn" data-action="record-cancel">Cancel</button>
         </div>
 
         <footer class="chat-foot">
@@ -79,26 +79,26 @@
             id="chat-input"
             class="chat-input"
             rows="1"
-            placeholder="和我说点什么吧…"
+            placeholder="Say something to me…"
           ></textarea>
-          <button id="chat-send" class="send-btn" title="发送">➤</button>
-          <button id="chat-mic" class="mic-btn" title="语音输入">🎤</button>
+          <button id="chat-send" class="send-btn" title="Send">➤</button>
+          <button id="chat-mic" class="mic-btn" title="Voice input">🎤</button>
         </footer>
       </section>
 
       <!-- ── Settings panel (VS Code style) ─────────────────────── -->
-      <section id="settings-panel" class="panel settings-panel hidden" aria-label="设置">
+      <section id="settings-panel" class="panel settings-panel hidden" aria-label="Settings">
         <header class="vs-titlebar">
-          <span class="vs-title">设置</span>
+          <span class="vs-title">Settings</span>
           <div class="vs-title-actions">
-            <button class="icon-btn" data-action="settings-reset" title="恢复默认设置">↺</button>
-            <button class="icon-btn" data-action="settings-open-file" title="打开配置文件">⧉</button>
-            <button class="icon-btn" data-action="settings-close" title="关闭">✕</button>
+            <button class="icon-btn" data-action="settings-reset" title="Restore default settings">↺</button>
+            <button class="icon-btn" data-action="settings-open-file" title="Open config file">⧉</button>
+            <button class="icon-btn" data-action="settings-close" title="Close">✕</button>
           </div>
         </header>
 
         <div class="vs-searchbar">
-          <input id="settings-search" type="text" placeholder="搜索设置" spellcheck="false" />
+          <input id="settings-search" type="text" placeholder="Search settings" spellcheck="false" />
         </div>
 
         <div class="vs-main">
@@ -122,7 +122,7 @@
       <div id="loading" class="loading">
         <div class="loading-card">
           <div class="spinner"></div>
-          <div id="loading-text">正在唤醒小精灵…</div>
+          <div id="loading-text">Waking up your pet…</div>
           <div id="loading-sub" class="loading-sub"></div>
         </div>
       </div>

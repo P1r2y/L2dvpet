@@ -3,10 +3,10 @@
  * GPT-SoVITS client (api_v2).
  *
  * GPT-SoVITS is a local voice-cloning service: hand it a fine-tuned GPT +
- * SoVITS weight pair（常驻模型）or a short reference clip（零样本克隆）, and it
- * speaks in that voice. It runs as a small local HTTP service, so the pet can
- * call it directly. Nothing is bundled or downloaded here — the app only
- * talks to the API.
+ * SoVITS weight pair (a resident model) or a short reference clip (zero-shot
+ * cloning) and it speaks in that voice. It runs as a small local HTTP service,
+ * so the pet can call it directly. Nothing is bundled or downloaded here — the
+ * app only talks to the API.
  *
  * Reference: https://github.com/RVC-Boss/GPT-SoVITS
  *
@@ -21,20 +21,20 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:9880'
 
 /** Reference modes supported by api_v2. */
 const REF_MODES = [
-  { value: 'audio', label: '参考音频（每次请求带上）' },
-  { value: 'weights', label: '常驻模型（先设置权重，再合成）' },
+  { value: 'audio', label: 'Reference audio (sent with every request)' },
+  { value: 'weights', label: 'Resident model (set weights, then synthesize)' },
 ]
 
 const TEXT_LANGS = [
-  { value: 'zh', label: '中文' },
-  { value: 'ja', label: '日本語' },
+  { value: 'zh', label: 'Chinese' },
+  { value: 'ja', label: 'Japanese' },
   { value: 'en', label: 'English' },
-  { value: 'ko', label: '한국어' },
-  { value: 'yue', label: '粵語' },
-  { value: 'auto', label: '自动切分（中英混合）' },
-  { value: 'auto_yue', label: '自动切分（粤英混合）' },
-  { value: 'all_ja', label: '日语优先' },
-  { value: 'all_zh', label: '中文优先' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'yue', label: 'Cantonese' },
+  { value: 'auto', label: 'Auto-split (mixed Chinese/English)' },
+  { value: 'auto_yue', label: 'Auto-split (mixed Cantonese/English)' },
+  { value: 'all_ja', label: 'Japanese first' },
+  { value: 'all_zh', label: 'Chinese first' },
 ]
 
 function normaliseBase(url) {
@@ -62,7 +62,7 @@ async function probe(baseUrl, timeoutMs = 2500) {
     if (res.ok) return { ok: true }
     return { ok: false, message: `HTTP ${res.status}` }
   } catch (err) {
-    const msg = err.name === 'AbortError' ? '连接超时' : err.message
+    const msg = err.name === 'AbortError' ? 'Connection timed out' : err.message
     return { ok: false, message: msg }
   }
 }
@@ -77,7 +77,7 @@ async function setWeights(baseUrl, { gptWeights, sovitsWeights }) {
       {},
       60000
     )
-    if (!res.ok) throw new Error(`set_gpt_weights 失败 HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`set_gpt_weights failed HTTP ${res.status}`)
     done.push('gpt')
   }
   if (sovitsWeights) {
@@ -86,20 +86,24 @@ async function setWeights(baseUrl, { gptWeights, sovitsWeights }) {
       {},
       60000
     )
-    if (!res.ok) throw new Error(`set_sovits_weights 失败 HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`set_sovits_weights failed HTTP ${res.status}`)
     done.push('sovits')
   }
   return done
 }
 
 /**
- * GPT-SoVITS 服务端在 Windows 上以 GBK 处理文本：凡是**没有 GBK 编码**的字符，
- * 都会让整条请求以 400/500 失败（服务端报 `'gbk' codec can't encode character …`）。
- * 实测触发字符包括「ロキシー・ミグルディア」的间隔号 U+30FB、♪ ♥ ✓ ©，以及全部 emoji；
- * 而 ★ → ① ℃ … 这些有 GBK 编码的符号一切正常 —— 规则与 GBK 编码能力逐字符吻合。
+ * On Windows the GPT-SoVITS server handles text as GBK: any character **without a
+ * GBK encoding** fails the whole request with 400/500 (the server reports
+ * `'gbk' codec can't encode character …`). Measured triggers include the middle
+ * dot U+30FB in "ロキシー・ミグルディア", the symbols ♪ ♥ ✓ ©, and every emoji,
+ * whereas ★ → ① ℃ … all work fine — they do have GBK encodings, so the rule
+ * matches GBK coverage character for character.
  *
- * Node 没有 GBK 编码器，但 `TextDecoder('gbk')` 可以反向枚举出全部 23939 个可编码字符，
- * 运行时构建一次即可得到精确集合（与 Python 的 gbk 编解码器逐字符一致）。
+ * Node has no GBK encoder, but `TextDecoder('gbk')` can be run over every byte
+ * pair to enumerate all 23939 encodable characters; building that set once at
+ * runtime gives the exact set (character for character identical to Python's
+ * gbk codec).
  */
 const GBK_CHARS = (() => {
   try {
@@ -115,19 +119,21 @@ const GBK_CHARS = (() => {
           const s = dec.decode(pair)
           if (s) set.add(s)
         } catch {
-          /* 不是合法 GBK 字节对 */
+          /* not a valid GBK byte pair */
         }
       }
     }
     return set.size > 0 ? set : null
   } catch {
-    return null // 运行时不带 GBK 支持 → 原样返回，不做处理
+    return null // no GBK support at runtime → return the text unchanged
   }
 })()
 
 /**
- * 把服务端编码不了的字符换成空格（保住断词），并合并因此产生的连续空白。
- * 只影响真正发给服务的文本；聊天气泡与历史记录里显示的原样保留。
+ * Replaces the characters the server cannot encode with a space (which keeps word
+ * breaks) and collapses the runs of whitespace that creates.
+ * Only the text actually sent to the service is affected; the chat bubble and
+ * the history keep the original characters.
  */
 function toGbkSafe(text) {
   if (!GBK_CHARS) return text
@@ -181,7 +187,7 @@ async function synthesize(text, opts = {}) {
     }
   } else {
     if (!opts.refAudio) {
-      throw new Error('GPT-SoVITS 需要参考音频路径（或改用「常驻模型」模式并设置权重路径）')
+      throw new Error('GPT-SoVITS needs a reference audio path (or switch to "resident model" mode and set the weight paths)')
     }
     params.set('ref_audio_path', opts.refAudio)
     params.set('prompt_text', opts.promptText || '')
@@ -202,14 +208,14 @@ async function synthesize(text, opts = {}) {
     }
     const hint =
       res.status === 400
-        ? '（常见原因：参考音频路径不存在、prompt_text 与音频不匹配、或模型权重未设置）'
+        ? ' (common causes: the reference audio path does not exist, prompt_text does not match the audio, or the weights are not set)'
         : res.status === 404
-          ? '（接口地址不对，GPT-SoVITS 的 API 端口默认是 9880）'
+          ? ' (wrong endpoint; the GPT-SoVITS API port defaults to 9880)'
           : ''
-    throw new Error(`GPT-SoVITS /tts 失败 HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
+    throw new Error(`GPT-SoVITS /tts failed HTTP ${res.status}${hint}: ${String(msg).slice(0, 300)}`)
   }
   const buf = Buffer.from(await res.arrayBuffer())
-  if (!buf.length) throw new Error('GPT-SoVITS 返回了空音频')
+  if (!buf.length) throw new Error('GPT-SoVITS returned empty audio')
   return buf
 }
 

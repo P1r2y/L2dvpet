@@ -73,8 +73,8 @@ function speechLikeWav(seconds = 4, sampleRate = 22050) {
  * Chat replies
  * ------------------------------------------------------------------ */
 const REPLY =
-  '[happy]当然记得呀！我们刚刚才聊过天呢～你问我叫什么名字，我说我叫小汐。\n' +
-  '现在轮到我问你啦：今天过得开心吗？[motion:nod]'
+  '[happy]Of course I remember! We were only just talking — you asked my name, and I said it is Xiaoxi.\n' +
+  'Now it is my turn: did you have a good day?[motion:nod]'
 
 function sseChunks(text) {
   // Split into small pieces the way a real token stream would arrive.
@@ -140,7 +140,7 @@ const server = http.createServer(async (req, res) => {
     const echo = lastUser ? lastUser.content.slice(0, 40) : ''
     const text = echo.includes('姓名') || echo.includes('名字')
       ? REPLY
-      : `[smile]我听到你说「${echo}」啦～这是模拟接口返回的内容，用来验证流式对话是否正常工作。[motion:nod]`
+      : `[smile]I heard you say "${echo}" — this is the mock reply, used to verify that streaming chat works.[motion:nod]`
 
     if (payload.stream) {
       res.writeHead(200, {
@@ -199,7 +199,7 @@ const server = http.createServer(async (req, res) => {
     console.log(`[mock] stt upload ${body.length} bytes`)
     if (body.length < 500) return sendJson(res, 400, { error: { message: 'audio too short' } })
     return sendJson(res, 200, {
-      text: '这是模拟语音识别返回的文字，用于验证语音输入流程。',
+      text: 'This is the mock transcription, used to verify the voice-input pipeline.',
       provider: 'mock',
     })
   }

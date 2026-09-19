@@ -15,12 +15,12 @@
 
 /** Locales offered in the settings panel, in display order. */
 const LANGUAGES = [
-  { id: 'zh-CN', label: '中文（普通话）', short: '中' },
-  { id: 'ja-JP', label: '日本語', short: '日' },
+  { id: 'zh-CN', label: 'Chinese (Mandarin)', short: 'ZH' },
+  { id: 'ja-JP', label: 'Japanese', short: 'JA' },
   { id: 'en-US', label: 'English (US)', short: 'EN' },
-  { id: 'zh-TW', label: '中文（台灣）', short: '繁' },
-  { id: 'zh-HK', label: '粵語', short: '粵' },
-  { id: 'ko-KR', label: '한국어', short: '한' },
+  { id: 'zh-TW', label: 'Chinese (Traditional, Taiwan)', short: 'ZH-T' },
+  { id: 'zh-HK', label: 'Cantonese', short: 'YUE' },
+  { id: 'ko-KR', label: 'Korean', short: 'KO' },
   { id: 'fr-FR', label: 'Français', short: 'FR' },
   { id: 'de-DE', label: 'Deutsch', short: 'DE' },
   { id: 'es-ES', label: 'Español', short: 'ES' },

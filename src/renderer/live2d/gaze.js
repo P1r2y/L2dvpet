@@ -20,7 +20,7 @@ const DEFAULTS = {
   eyeAmount: 1,
   eyeMax: 0.7,
   headAmount: 0.45,
-  // psd2live 九轴经纬网: ParamAngleX keyed at ±45°, so this is 31% of travel.
+  // psd2live's 9-pose lat/long grid: ParamAngleX is keyed at ±45°, so this is 31% of travel.
   headYawMax: 14,
   // ParamAngleY range is ±30°.
   headPitchMax: 9,
@@ -63,7 +63,8 @@ export class GazeController {
     this.overrideUntil = 0
     /** While true, gaze relaxes to centre (e.g. while being petted). */
     this.suppressed = false
-    /** 抚摸时头部跟随鼠标的强度, 0..1 (设置 → 抚摸 → 头部跟随鼠标). */
+    /** How strongly the head follows the cursor while petting, 0..1
+     * (Settings → Petting → Head follows cursor). */
     this.pettingFollow = 0
     this.output = { eyeX: 0, eyeY: 0, headX: 0, headY: 0, headZ: 0, bodyX: 0, bodyY: 0 }
   }
@@ -85,7 +86,7 @@ export class GazeController {
   /**
    * While the pet is being stroked the eyes stop tracking — darting pupils with
    * a hand on her head read as broken — but the head keeps following the cursor
-   * at this strength (设置 → 抚摸 → 头部跟随鼠标). 0 keeps the old behaviour of
+   * at this strength (Settings → Petting → Head follows cursor). 0 keeps the old behaviour of
    * a fully parked head.
    */
   setPettingFollow(amount) {
@@ -193,7 +194,8 @@ export class GazeController {
     out.bodyY = clamp(y * (Number(cfg.bodyAmount) ?? 0.2) * bodyMax * 0.5, -bodyMax, bodyMax)
 
     /*
-     * 抚摸中：眼睛停住，头与身体按「头部跟随鼠标」轻微跟随。Scaling the finished
+     * While petting: the eyes stop, and the head and body follow slightly per
+     * "Head follows cursor". Scaling the finished
      * output keeps the follow proportional to whatever the gaze settings already
      * produce, so no second set of amounts has to be kept in sync.
      */

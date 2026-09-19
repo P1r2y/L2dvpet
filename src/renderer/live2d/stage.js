@@ -62,12 +62,12 @@ export class PetStage {
     this.layer = layer
     this.fxLayer = fxLayer
 
-    if (!PIXI) throw new Error('PIXI 未加载，请先执行 npm run build')
+    if (!PIXI) throw new Error('PIXI is not loaded — run npm run build first')
     if (!PIXI.live2d || !PIXI.live2d.Live2DModel) {
-      throw new Error('pixi-live2d-display 未加载（缺少 PIXI.live2d）')
+      throw new Error('pixi-live2d-display is not loaded (PIXI.live2d is missing)')
     }
     if (!window.Live2DCubismCore) {
-      throw new Error('Live2D Cubism Core 未加载（vendor/live2dcubismcore.min.js）')
+      throw new Error('Live2D Cubism Core is not loaded (vendor/live2dcubismcore.min.js)')
     }
 
     PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker)
@@ -79,7 +79,7 @@ export class PetStage {
     this.layerWidth = 320
     this.layerHeight = 480
 
-    onProgress?.('创建渲染器…')
+    onProgress?.('Creating renderer…')
     // Render at device resolution so the model stays crisp on HiDPI displays.
     const dpr = Math.max(1, window.devicePixelRatio || 1)
     this.app = new PIXI.Application({
@@ -101,7 +101,7 @@ export class PetStage {
     // hit testing always happens immediately after a fresh frame.
     this.app.renderer.on('postrender', () => this._flushHitTest())
 
-    onProgress?.('加载 Live2D 模型…')
+    onProgress?.('Loading Live2D model…')
     const t0 = performance.now()
     this.model = await PIXI.live2d.Live2DModel.from(modelUrl, {
       autoInteract: false,
@@ -117,7 +117,7 @@ export class PetStage {
     this.baseWidth = this.model.width
     this.baseHeight = this.model.height
     if (!(this.baseWidth > 0) || !(this.baseHeight > 0)) {
-      throw new Error('模型尺寸异常，可能是 moc3 版本不受当前 Cubism Core 支持')
+      throw new Error('Unexpected model size — the moc3 version may not be supported by this Cubism Core')
     }
     console.info(`[stage] native model size ${Math.round(this.baseWidth)}×${Math.round(this.baseHeight)}`)
 
@@ -575,7 +575,7 @@ export class PetStage {
   }
 
   /**
-   * Master switch for motion playback (设置 → 动作 → 播放动作).
+   * Master switch for motion playback (Settings → Motion → Play motions).
    *
    * Stopping the app's scheduler is only half of it: the library also
    * auto-plays the model's idle group whenever nothing else is running, and
@@ -650,7 +650,7 @@ const EYE_OPEN_IDS = new Set(['ParamEyeLOpen', 'ParamEyeROpen'])
  *
  * Blinking belongs to the app (see `Pet._writeEyeOpen`). A model whose idle
  * motion has a blink baked into its loop — this one blinks at 2.780 s of every
- * 6 s — otherwise keeps blinking with 自动眨眼 switched off, and the only way to
+ * 6 s — otherwise keeps blinking with Auto blink switched off, and the only way to
  * cancel that from the outside is to overwrite the eye channels after the fact,
  * which also throws away authored detail such as the nod motion's 0.75
  * eye-press. Rewriting the idle curves costs nothing else: a curve's keyframes
