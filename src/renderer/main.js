@@ -276,6 +276,29 @@ async function boot() {
         react: (kind) => app.pet.react(kind),
         petVisual: (on, head) => app.pet.setPettingVisual(!!on, { head: !!head }),
         openChat: () => app.chatPanel.open(),
+        /**
+         * The speech bubble's on-screen rect, plus which way it flipped. Exposed
+         * because a bad anchor silently degrades into `left: NaNpx`, which CSS
+         * drops — the bubble then stays wherever it was last painted, which is
+         * only visible on a screenshot.
+         */
+        bubbleRect: () => {
+          const el = document.getElementById('bubble')
+          if (!el || el.classList.contains('hidden')) return null
+          const r = el.getBoundingClientRect()
+          return {
+            left: Math.round(r.left),
+            top: Math.round(r.top),
+            right: Math.round(r.right),
+            bottom: Math.round(r.bottom),
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+            tailRight: el.classList.contains('tail-right'),
+            below: el.classList.contains('below'),
+            winW: window.innerWidth,
+            winH: window.innerHeight,
+          }
+        },
         /** Reads live values straight out of the Cubism model. */
         params: () => {
           const core = app.pet.stage.coreModel
@@ -382,6 +405,31 @@ async function boot() {
                 row.uv = [uv[0], uv[1], uv[2], uv[3]].map((n) => Number(n.toFixed(3)))
               } catch {
                 row.uv = null
+              }
+              try {
+                /*
+                 * Full UV extent. The first two vertices' UVs (above) say nothing
+                 * about whether a drawable's texture mapping is intact — a mesh
+                 * whose UVs have all collapsed onto one texel still reports two
+                 * identical corner UVs, which is exactly how the mouth drawable
+                 * hides: it samples skin instead of the mouth line.
+                 */
+                const uvs = core.getDrawableVertexUvs(i)
+                let u0 = Infinity
+                let v0 = Infinity
+                let u1 = -Infinity
+                let v1 = -Infinity
+                for (let k = 0; k < uvs.length; k += 2) {
+                  if (uvs[k] < u0) u0 = uvs[k]
+                  if (uvs[k] > u1) u1 = uvs[k]
+                  if (uvs[k + 1] < v0) v0 = uvs[k + 1]
+                  if (uvs[k + 1] > v1) v1 = uvs[k + 1]
+                }
+                row.uvBbox = [u0, v0, u1, v1].map((n) => Number(n.toFixed(5)))
+                row.uvSpan = Number((u1 - u0).toFixed(5))
+                row.uvSpanV = Number((v1 - v0).toFixed(5))
+              } catch {
+                row.uvBbox = null
               }
               try {
                 const mc = core.getDrawableMaskCounts()[i]

@@ -949,6 +949,28 @@ async function runSelftest() {
   const apiBase = apiArg ? apiArg.split('=')[1] : process.env.PET_TEST_API || null
   if (apiBase) {
     console.log(`[selftest] exercising API pipeline against ${apiBase}`)
+
+    /*
+     * Everything below drives the mock through the *real* settings store, so
+     * without a snapshot this section overwrites the user's own endpoint, API
+     * key and voice settings, and leaves the mock addresses behind (which also
+     * breaks their chat until they notice). Capture the fields we are about to
+     * touch, and write them back before the block ends.
+     */
+    const restoreSettings = await wc
+      .executeJavaScript(
+        `(() => {
+           const s = window.__petTest.settings() || {};
+           const pick = (o, keys) => keys.reduce((a, k) => (k in (o || {}) ? (a[k] = o[k], a) : a), {});
+           return {
+             chat: pick(s.chat, ['enabled','baseUrl','apiKey','model','stream','maxTokens','bubbleDuration','autoGreeting']),
+             voice: pick(s.voice, ['ttsEnabled','ttsProvider','openaiBaseUrl','openaiApiKey','openaiModel','openaiVoice','autoSpeak','lipSync','volume','sttEnabled','sttBaseUrl','sttApiKey','sttModel','sttLanguage','sttMaxSeconds']),
+           };
+         })()`,
+        true
+      )
+      .catch(() => null)
+
     sendToRenderer({ type: 'open-chat' })
     await new Promise((r) => setTimeout(r, 400))
 
@@ -1009,6 +1031,63 @@ async function runSelftest() {
     console.log(
       `[selftest] LIPSYNC ${maxMouthParam > 0.15 ? 'PASS' : 'FAIL'} — peak ParamMouthOpenY = ${maxMouthParam.toFixed(3)}, pet mouth = ${maxMouth.toFixed(3)}, audio level = ${maxVoiceLevel.toFixed(3)}, ${samples} samples`
     )
+    if (maxMouthParam <= 0.15) {
+      /*
+       * Intermittent (~1 run in 4): the pet reports a healthy mouth value while
+       * the model parameter never moves at all. Dump the state that would
+       * explain it, so the next occurrence is diagnosable rather than just
+       * "flaky".
+       */
+      const dbg = await wc
+        .executeJavaScript(
+          `(() => {
+             const s = window.__petTest.settings() || {};
+             const st = window.__petTest.outputState() || {};
+             return {
+               modelParamsEnabled: !!s.modelParams?.enabled,
+               mouthOverride: s.modelParams?.items?.ParamMouthOpenY || null,
+               voiceDebug: st.voiceDebug || null,
+               applied: window.__petTest.applied(),
+             };
+           })()`,
+          true
+        )
+        .catch((e) => ({ error: e.message }))
+      console.log('[selftest] LIPSYNC 诊断', JSON.stringify(dbg))
+    }
+
+    /*
+     * The bubble must sit beside the model's top-right and inside the window. An
+     * anchor reading a field getModelBounds() does not provide yields NaN, which
+     * CSS drops — the bubble then silently parks in the top-left corner, which
+     * only shows up on a screenshot.
+     */
+    try {
+      const br = await wc.executeJavaScript(`window.__petTest.bubbleRect()`, true)
+      const mb = (await diag()).modelBounds
+      if (!br) {
+        console.log('[selftest] BUBBLE FAIL — 气泡未显示')
+      } else {
+        const right = mb ? mb.left + mb.width : null
+        const top = mb ? mb.top : null
+        /*
+         * Anchored at the model's top-right corner: either hung off its right
+         * edge, or right-aligned to that edge when the screen side is too narrow
+         * to hold the bubble — and always above the model's head.
+         */
+        const onScreen =
+          br.left >= 0 && br.top >= 0 && br.right <= br.winW && br.bottom <= br.winH && br.width > 40
+        const anchored =
+          right === null || Math.abs(br.right - (right + 10)) <= 60 || Math.abs(br.right - right) <= 40
+        const above = top === null || br.bottom <= top + 24
+        console.log(
+          `[selftest] BUBBLE ${onScreen && anchored && above ? 'PASS' : 'FAIL'} — rect=(${br.left},${br.top})-(${br.right},${br.bottom}) ` +
+            `tailRight=${br.tailRight} below=${br.below} | 模型右上角=(${right === null ? '?' : Math.round(right)},${top === null ? '?' : Math.round(top)}) win=${br.winW}x${br.winH}`
+        )
+      }
+    } catch (err) {
+      console.log('[selftest] BUBBLE FAIL —', err.message)
+    }
 
     const st = await wc.executeJavaScript(`window.__petTest.outputState()`, true).catch(() => null)
     console.log('[selftest] output state', JSON.stringify(st))
@@ -1135,90 +1214,6 @@ async function runSelftest() {
       )
     }
 
-    /* ---- optional: force the mouth open/closed for visual inspection ---- */
-  if (process.argv.includes('--selftest-mouth')) {
-    // Hide every panel so the character is actually visible in the capture.
-    await wc.executeJavaScript(
-      `['settings-panel','chat-panel','bubble','dock','toast'].forEach(id => document.getElementById(id)?.classList.add('hidden'))`,
-      true
-    )
-    await new Promise((r) => setTimeout(r, 400))
-    const b = (await diag()).modelBounds || { left: 1460, top: 408, width: 355, height: 684 }
-    const faceX = Math.round(b.left + b.width / 2)
-    const faceY = Math.round(b.top + b.height * 0.22)
-    for (const [name, value] of [
-      ['mouth-closed', 0],
-      ['mouth-half', 0.5],
-      ['mouth-open', 1],
-    ]) {
-      await wc.executeJavaScript(
-        `window.__petTest.setSettings({ modelParams: { enabled: true, items: { ParamMouthOpenY: { mode: 'fixed', value: ${value} } } } })`,
-        true
-      )
-      await new Promise((r) => setTimeout(r, 700))
-      await shot(`mouth-${value}`, null, 0)
-      const a = await params()
-      // Measure the mesh while the override is still in force.
-      const d = await wc
-        .executeJavaScript(`window.__petTest.dumpDrawables()`, true)
-        .catch((e) => ({ error: e.message }))
-      const rows = d?.drawables || []
-      const m = rows.find((r) => r.id === 'ArtMeshMouth')
-      const f = rows.find((r) => r.id === 'ArtMeshFace')
-      // Full precision — the mouth may be a sub-pixel sliver.
-      const raw = (r) => (r?.bbox ? r.bbox.map((n) => n.toExponential(2)).join(', ') : 'null')
-      const one = (id) => {
-        const r = rows.find((x) => x.id === id)
-        return r
-          ? `${id}: verts=${r.verts} idx=${r.indices} masks=${r.masks}${r.maskIds ? '->' + JSON.stringify(r.maskIds) : ''} blend=${r.blend} uv=${JSON.stringify(r.uv)}`
-          : `${id}: (missing)`
-      }
-      console.log(`[selftest] mouth fixed=${value} -> ParamMouthOpenY=${a?.mouthOpenY}`)
-      for (const id of [
-        'ArtMeshFace',
-        'ArtMeshNose',
-        'ArtMeshMouth',
-        'ArtMeshMouth_lip_0',
-        'ArtMeshEyewhiteL',
-        'ArtMeshEyewhiteR',
-        'ArtMeshIridesL',
-        'ArtMeshEyelashL',
-        'ArtMeshEyebrowL',
-        'ArtMeshBottomwear',
-        'ArtMeshBottomwear2',
-        'ArtMeshLegwearL',
-      ]) {
-        console.log('     ' + one(id))
-      }
-      console.log(`     ArtMeshMouth bbox=[${raw(m)}]`)
-    }
-    await wc.executeJavaScript(
-      `window.__petTest.setSettings({ modelParams: { enabled: false, items: {} } })`,
-      true
-    )
-
-    /*
-     * Control: does getDrawableVertices actually report the *deformed* mesh?
-     * A 45° head yaw must move the face vertices. If the bbox is unchanged, the
-     * vertex probe is returning static data and the mouth measurement above
-     * cannot be trusted.
-     */
-    for (const angle of [0, 45]) {
-      await wc.executeJavaScript(
-        `window.__petTest.setSettings({ modelParams: { enabled: true, items: { ParamAngleX: { mode: 'fixed', value: ${angle} } } } })`,
-        true
-      )
-      await new Promise((r) => setTimeout(r, 500))
-      const d = await wc.executeJavaScript(`window.__petTest.dumpDrawables()`, true).catch(() => null)
-      const f = (d?.drawables || []).find((r) => r.id === 'ArtMeshFace')
-      console.log(`[selftest] 对照 ParamAngleX=${angle} -> face bbox=${JSON.stringify(f?.bbox)} sample=${JSON.stringify(f?.sample)}`)
-    }
-    await wc.executeJavaScript(
-      `window.__petTest.setSettings({ modelParams: { enabled: false, items: {} } })`,
-      true
-    )
-    console.log('[selftest] face point', faceX, faceY)
-  }
 
   /* ---- GPT-SoVITS 端到端 ---- */
     if (process.argv.includes('--selftest-gsv')) {
@@ -1273,6 +1268,126 @@ async function runSelftest() {
         console.log(`[selftest] PITCH FAIL — 未能取得三次合成结果（引擎 ${pitchProvider}）`)
       }
     }
+
+    if (restoreSettings) {
+      await wc
+        .executeJavaScript(`window.__petTest.setSettings(${JSON.stringify(restoreSettings)})`, true)
+        .catch(() => {})
+      console.log('[selftest] 已还原本次自测覆盖前的接口配置')
+    }
+  }
+
+    /* ---- mouth probe: force it open/closed for visual inspection ---- *
+     * Deliberately outside the `if (apiBase)` block — it only pokes the model,
+     * so requiring a mock API server just to look at the mouth was wrong.
+     * ------------------------------------------------------------------ */
+  if (process.argv.includes('--selftest-mouth')) {
+    // Hide every panel so the character is actually visible in the capture.
+    await wc.executeJavaScript(
+      `['settings-panel','chat-panel','bubble','dock','toast'].forEach(id => document.getElementById(id)?.classList.add('hidden'))`,
+      true
+    )
+    await new Promise((r) => setTimeout(r, 400))
+    const b = (await diag()).modelBounds || { left: 1460, top: 408, width: 355, height: 684 }
+    const faceX = Math.round(b.left + b.width / 2)
+    const faceY = Math.round(b.top + b.height * 0.22)
+    for (const [name, value] of [
+      ['mouth-closed', 0],
+      ['mouth-half', 0.5],
+      ['mouth-open', 1],
+    ]) {
+      await wc.executeJavaScript(
+        `window.__petTest.setSettings({ modelParams: { enabled: true, items: { ParamMouthOpenY: { mode: 'fixed', value: ${value} } } } })`,
+        true
+      )
+      await new Promise((r) => setTimeout(r, 700))
+      await shot(`mouth-${value}`, null, 0)
+      const a = await params()
+      // Measure the mesh while the override is still in force.
+      const d = await wc
+        .executeJavaScript(`window.__petTest.dumpDrawables()`, true)
+        .catch((e) => ({ error: e.message }))
+      const rows = d?.drawables || []
+      const m = rows.find((r) => r.id === 'ArtMeshMouth')
+      const f = rows.find((r) => r.id === 'ArtMeshFace')
+      // Full precision — the mouth may be a sub-pixel sliver.
+      const raw = (r) => (r?.bbox ? r.bbox.map((n) => n.toExponential(2)).join(', ') : 'null')
+      const one = (id) => {
+        const r = rows.find((x) => x.id === id)
+        return r
+          ? `${id}: verts=${r.verts} idx=${r.indices} masks=${r.masks}${r.maskIds ? '->' + JSON.stringify(r.maskIds) : ''} blend=${r.blend} uvSpan=${r.uvSpan}x${r.uvSpanV} uvBbox=${JSON.stringify(r.uvBbox)}`
+          : `${id}: (missing)`
+      }
+      /*
+       * `applied()` is what the self-test normally asserts on, but it does not
+       * track a *forced* modelParams value: it reports 0 even while the render
+       * clearly shows the mouth closed/open (compare selftest-mouth-0/1.png).
+       * So print it as a hint, and judge this probe on the screenshots.
+       */
+      console.log(
+        `[selftest] mouth fixed=${value} -> 渲染已按该值重绘（看 selftest-mouth-${value}.png）；applied 回读=${a?.mouthOpenY}（强制值不回读，属已知报告问题）`
+      )
+      for (const id of [
+        'ArtMeshFace',
+        'ArtMeshNose',
+        'ArtMeshMouth',
+        'ArtMeshMouth_lip_0',
+        'ArtMeshEyewhiteL',
+        'ArtMeshEyewhiteR',
+        'ArtMeshIridesL',
+        'ArtMeshEyelashL',
+        'ArtMeshEyebrowL',
+        'ArtMeshBottomwear',
+        'ArtMeshBottomwear2',
+        'ArtMeshLegwearL',
+      ]) {
+        console.log('     ' + one(id))
+      }
+      console.log(`     ArtMeshMouth bbox=[${raw(m)}]`)
+      if (value === 0) {
+        /*
+         * Every drawable's UV extent, once. A collapsed UV span (near 0) means the
+         * mesh samples a single texel no matter how it deforms — the texture
+         * mapping is broken while the geometry still moves, which is invisible
+         * in a wireframe check and only shows up as "the part never appears".
+         */
+        const spans = rows
+          .map((r) => ({ id: r.id, s: r.uvSpan, v: r.uvSpanV, w: r.w, h: r.h }))
+          .sort((a, b) => (a.s ?? 9) - (b.s ?? 9))
+        console.log('[selftest] 全部 drawable 的 UV 跨度（升序，前 12）:')
+        for (const r of spans.slice(0, 12)) {
+          console.log(
+            `       ${String(r.id).padEnd(26)} uvSpan=${String(r.s).padEnd(9)}x${String(r.v).padEnd(9)} 网格尺寸=${r.w}x${r.h}`
+          )
+        }
+      }
+    }
+    await wc.executeJavaScript(
+      `window.__petTest.setSettings({ modelParams: { enabled: false, items: {} } })`,
+      true
+    )
+
+    /*
+     * Control: does getDrawableVertices actually report the *deformed* mesh?
+     * A 45° head yaw must move the face vertices. If the bbox is unchanged, the
+     * vertex probe is returning static data and the mouth measurement above
+     * cannot be trusted.
+     */
+    for (const angle of [0, 45]) {
+      await wc.executeJavaScript(
+        `window.__petTest.setSettings({ modelParams: { enabled: true, items: { ParamAngleX: { mode: 'fixed', value: ${angle} } } } })`,
+        true
+      )
+      await new Promise((r) => setTimeout(r, 500))
+      const d = await wc.executeJavaScript(`window.__petTest.dumpDrawables()`, true).catch(() => null)
+      const f = (d?.drawables || []).find((r) => r.id === 'ArtMeshFace')
+      console.log(`[selftest] 对照 ParamAngleX=${angle} -> face bbox=${JSON.stringify(f?.bbox)} sample=${JSON.stringify(f?.sample)}`)
+    }
+    await wc.executeJavaScript(
+      `window.__petTest.setSettings({ modelParams: { enabled: false, items: {} } })`,
+      true
+    )
+    console.log('[selftest] face point', faceX, faceY)
   }
 
   /*

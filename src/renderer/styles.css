@@ -146,6 +146,34 @@ body {
   max-width: 380px;
   min-width: 150px;
   pointer-events: auto;
+  /* Slides out from the side it is anchored to — no bounce, just an arrival. */
+  animation: bubbleIn 0.16s ease-out both;
+}
+
+.bubble.tail-right {
+  animation-name: bubbleInRight;
+}
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translate(-6px, 6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bubbleInRight {
+  from {
+    opacity: 0;
+    transform: translate(6px, 6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .bubble-inner {
@@ -180,6 +208,16 @@ body {
 .bubble.tail-right .bubble-tail {
   left: auto;
   right: 34px;
+}
+
+/* Bubble sits under the model: flip the tail so it still points at her head. */
+.bubble.below .bubble-tail {
+  top: -9px;
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid var(--vs-border);
+  border-left: 1px solid var(--vs-border);
+  border-radius: 4px 0 0 0;
 }
 
 .bubble-actions {
@@ -1275,4 +1313,74 @@ body {
 
 .vs-row .vs-control {
   row-gap: 6px;
+}
+
+/* ── Settings motion ─────────────────────────────────────────────────────── *
+ * #settings-body is re-rendered on every section switch, so an animation on
+ * its direct children replays by itself — no JS bookkeeping needed. Timings
+ * stay short (≤170ms) and ease out: the panel should feel like it settles into
+ * place, not like a slideshow. Kept at the end of the sheet so these win over
+ * the per-control rules above.
+ * ------------------------------------------------------------------------- */
+.vs-content > * {
+  animation: vsEnter 0.17s ease-out both;
+}
+
+/* A shallow stagger reads as "the section arrived", without slowing anyone down. */
+.vs-content > *:nth-child(2) { animation-delay: 0.02s; }
+.vs-content > *:nth-child(3) { animation-delay: 0.04s; }
+.vs-content > *:nth-child(4) { animation-delay: 0.06s; }
+.vs-content > *:nth-child(5) { animation-delay: 0.08s; }
+.vs-content > *:nth-child(n + 6) { animation-delay: 0.1s; }
+
+@keyframes vsEnter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* State changes ease instead of snapping. */
+.vs-nav-section,
+.vs-nav-group {
+  transition: background 0.09s ease-out, color 0.09s ease-out;
+}
+
+.vs-row {
+  transition: background 0.09s ease-out;
+}
+
+.vs-input,
+.vs-textarea,
+.vs-input-num {
+  transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out, background 0.12s ease-out;
+}
+
+.icon-btn,
+.vs-btn,
+.vs-chip {
+  transition: background 0.09s ease-out, border-color 0.09s ease-out, color 0.09s ease-out,
+    transform 0.06s ease-out;
+}
+
+.icon-btn:active,
+.vs-btn:active:not(:disabled),
+.vs-chip:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vs-content > * {
+    animation: none;
+  }
+
+  .icon-btn:active,
+  .vs-btn:active:not(:disabled),
+  .vs-chip:active:not(:disabled) {
+    transform: none;
+  }
 }

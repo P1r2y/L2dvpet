@@ -103,27 +103,51 @@ export class SpeechBubble {
     const w = this.el.offsetWidth || 240
     const h = this.el.offsetHeight || 60
     const margin = 12
+    const gap = 10
 
-    // Sit just above the top of her silhouette (hair), tail pointing at her face.
-    const silhouetteTop = bounds ? bounds.top : head.y - head.radius
-    let left = clamp(head.x - w / 2, margin, window.innerWidth - w - margin)
-    let top = silhouetteTop - h - 14
+    // getModelBounds() hands back left/top/width/height only — there is no
+    // `right`/`bottom`, and reading them yields undefined, which poisons the
+    // layout into NaN and leaves the bubble stuck where it was last painted.
+    const left0 = bounds ? bounds.left : head.x - head.radius
+    const right0 = bounds ? bounds.left + bounds.width : head.x + head.radius
+    const top0 = bounds ? bounds.top : head.y - head.radius
+    const bottom0 = bounds ? bounds.top + bounds.height : head.y + head.radius
+
+    /*
+     * The bubble hangs off the model's top-right corner: its left edge starts at
+     * the model's right edge and its bottom sits just above the model's head, so
+     * it reads as speech coming from beside her. It mirrors to the top-left when
+     * the right side of the screen is too narrow, and drops below the model when
+     * there is no room above.
+     */
+    const fitsRight = left0 >= 0 && right0 + gap + w <= window.innerWidth - margin
+    this.el.classList.toggle('tail-right', !fitsRight)
+    let left = fitsRight
+      ? right0 + gap
+      : clamp(right0 - w, margin, Math.max(margin, window.innerWidth - w - margin))
+
+    let top = top0 - h - gap
     let below = false
     if (top < margin) {
-      const belowTop = (bounds ? bounds.bottom : head.y + head.radius) + 14
-      top = clamp(belowTop, margin, window.innerHeight - h - margin)
+      top = clamp(bottom0 + gap, margin, Math.max(margin, window.innerHeight - h - margin))
       below = true
     }
+    this.el.classList.toggle('below', below)
 
     this.el.style.left = `${Math.round(left)}px`
     this.el.style.top = `${Math.round(top)}px`
-    this.el.classList.toggle('below', below)
 
-    // Point the tail at the head.
+    // Point the tail at the head (measured from whichever edge it sits on).
     const tail = this.el.querySelector('.bubble-tail')
     if (tail) {
-      const tailX = clamp(head.x - left, 22, Math.max(24, w - 40))
-      tail.style.left = `${Math.round(tailX)}px`
+      const maxOff = Math.max(20, w - 36)
+      if (this.el.classList.contains('tail-right')) {
+        tail.style.right = `${Math.round(clamp(left + w - head.x - 9, 18, maxOff))}px`
+        tail.style.left = 'auto'
+      } else {
+        tail.style.left = `${Math.round(clamp(head.x - left - 9, 18, maxOff))}px`
+        tail.style.right = 'auto'
+      }
     }
   }
 }
