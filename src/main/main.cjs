@@ -58,8 +58,17 @@ const isSelftest = !!selftestArg
 const useOffscreen = isSelftest && !process.argv.includes('--onscreen')
 const selftestPath = (() => {
   if (!selftestArg) return null
-  const eq = selftestArg.indexOf('=')
-  return eq > 0 ? selftestArg.slice(eq + 1) : path.join(ROOT, 'scripts', 'selftest.png')
+  /*
+   * Only `--selftest` / `--selftest=<path>` carry a screenshot path. The other
+   * flags that merely start with `--selftest` (`--selftest-api=<url>`,
+   * `--selftest-mouth`, `--selftest-gsv`) must not donate their `=` value —
+   * taking a URL as a path used to hang the run before the first screenshot.
+   */
+  const own = process.argv.find((a) => a === '--selftest' || a.startsWith('--selftest='))
+  const fallback = path.join(ROOT, 'scripts', 'selftest.png')
+  if (!own) return fallback
+  const eq = own.indexOf('=')
+  return eq > 0 ? own.slice(eq + 1) : fallback
 })()
 let mainWindow = null
 let tray = null
