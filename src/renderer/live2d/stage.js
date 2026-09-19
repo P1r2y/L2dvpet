@@ -572,6 +572,32 @@ export class PetStage {
     }
   }
 
+  /**
+   * Master switch for motion playback (设置 → 动作 → 播放动作).
+   *
+   * Stopping the app's scheduler is only half of it: the library also
+   * auto-plays the model's idle group whenever nothing else is running, and
+   * that is what keeps a character swaying — and, in this model, blinking,
+   * because its Idle motion bakes a blink into every loop. `groups.idle` is the
+   * switch the library actually consults, so point it at a group that does not
+   * exist to turn playback off at the source.
+   */
+  setMotionsEnabled(enabled) {
+    const mm = this.model?.internalModel?.motionManager
+    if (!mm) return
+    try {
+      if (!this._idleGroupName) this._idleGroupName = mm.groups?.idle || 'Idle'
+      if (enabled) {
+        mm.groups.idle = this._idleGroupName
+      } else {
+        mm.stopAllMotions()
+        mm.groups.idle = '__motions-disabled__'
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   /** Toggles hair/skirt physics (kept so it can be restored). */
   setPhysics(enabled) {
     const im = this.model?.internalModel

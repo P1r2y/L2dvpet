@@ -138,6 +138,7 @@ async function boot() {
     }
 
     app.dock = new QuickDock({ el: $('#dock'), pet })
+    app.dock.setEnabled(app.settings?.ui?.dockVisible !== false)
     app.menu = new ContextMenu($('#ctx-menu'))
 
     app.chatPanel = new ChatPanel({
@@ -267,6 +268,18 @@ async function boot() {
           app.pet.applySettings(app.settings)
           applyTheme()
           updateDockSpeakIcon()
+          /*
+           * A real change goes through the panel, which emits one
+           * settings:changed per touched key — anything that reacts on the bus
+           * (the dock, the theme, the interaction layer) only updates because of
+           * it. Announce the same way here, or this shortcut drives a path the
+           * app never uses and quietly skips half the reaction.
+           */
+          for (const section of Object.keys(partial || {})) {
+            for (const key of Object.keys(partial[section] || {})) {
+              bus.emit('settings:changed', { path: `${section}.${key}` })
+            }
+          }
           return app.settings
         },
         chat: (text) => app.chat.send(text),
@@ -276,6 +289,10 @@ async function boot() {
         react: (kind) => app.pet.react(kind),
         petVisual: (on, head) => app.pet.setPettingVisual(!!on, { head: !!head }),
         openChat: () => app.chatPanel.open(),
+        /** Which group the library will auto-play next — the 播放动作 switch. */
+        idleMotionGroup: () => app.pet.stage?.model?.internalModel?.motionManager?.groups?.idle ?? null,
+        /** Whether the quick dock is currently suppressed. */
+        dockHidden: () => !!document.getElementById('dock')?.classList.contains('hidden'),
         /**
          * The speech bubble's on-screen rect, plus which way it flipped. Exposed
          * because a bad anchor silently degrades into `left: NaNpx`, which CSS
@@ -1098,6 +1115,7 @@ function wireBus() {
   /* ---- settings ---- */
   bus.on('settings:changed', async ({ path }) => {
     app.pet.applySettings(app.settings)
+    app.dock?.setEnabled(app.settings?.ui?.dockVisible !== false)
     if (path === 'ui.accent' || path === 'ui.fontSize' || path === 'ui.panelOpacity') applyTheme()
     app.interaction?.refresh()
   })
@@ -1105,6 +1123,7 @@ function wireBus() {
   bus.on('settings:reloaded', async () => {
     app.settings = await bridge.settings.get()
     app.pet.applySettings(app.settings)
+    app.dock?.setEnabled(app.settings?.ui?.dockVisible !== false)
     applyTheme()
     updateDockSpeakIcon()
     toastOk('已恢复默认设置')

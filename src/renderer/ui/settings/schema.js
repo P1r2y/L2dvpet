@@ -226,8 +226,9 @@ export const SETTINGS_TREE = [
       },
       {
         id: 'motions',
-        label: '随机动作',
+        label: '动作',
         fields: [
+          SW('idle.motionsEnabled', '播放动作（总开关）'),
           SW('idle.autoMotion', '空闲时随机播放动作'),
           RNG('idle.motionMin', '最短间隔', 5, 120, 1, 's', (v) => v),
           RNG('idle.motionMax', '最长间隔', 6, 240, 1, 's', (v) => v),

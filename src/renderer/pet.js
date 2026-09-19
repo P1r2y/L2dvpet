@@ -109,6 +109,7 @@ export class Pet {
     this.stage.setPhysics(s.idle?.physics !== false)
     this.stage.setBreath(s.idle?.breath !== false, s.idle?.breathSpeed)
     this.stage.setMotionSpeed(s.idle?.motionSpeed)
+    this.stage.setMotionsEnabled(s.idle?.motionsEnabled !== false)
 
     if (this.stage.layer) {
       this.stage.layer.classList.toggle('no-shadow', s.model?.shadow === false)
@@ -333,11 +334,28 @@ export class Pet {
       }
     }
     const open = clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
-    // Multiply rather than set, so the nod motion's 0.75 eye-dip still shows.
-    // A pinned eye parameter is left alone — "固定" means fixed.
-    if (!this._isParamFixed(P.eyeLOpen)) this.stage.scaleParam(core, P.eyeLOpen, open)
-    if (!this._isParamFixed(P.eyeROpen)) this.stage.scaleParam(core, P.eyeROpen, open)
+    this._writeEyeOpen(core, P.eyeLOpen, open)
+    this._writeEyeOpen(core, P.eyeROpen, open)
     this._applyManual(core, 'early')
+  }
+
+  /**
+   * Writes one eye-open channel.
+   *
+   * Multiplying preserves whatever a motion authored for it: the Nod curve
+   * presses the eyes to 0.75, and the model's own Idle motion has a blink baked
+   * into every 6 s loop (2.780 s → 0). That is what we want while auto-blink is
+   * on. It is exactly what we cannot have while it is off — a multiply can never
+   * cancel a motion that drives the channel to 0 on its own, which is why
+   * turning 自动眨眼 off still blinked. In that mode the app owns the channel
+   * outright, so nothing blinks it.
+   *
+   * A pinned parameter is left alone either way — 固定 means fixed.
+   */
+  _writeEyeOpen(core, id, open) {
+    if (this._isParamFixed(id)) return
+    if (this.settings?.idle?.autoBlink === false) this.stage.setParam(core, id, open)
+    else this.stage.scaleParam(core, id, open)
   }
 
   /**
@@ -379,8 +397,8 @@ export class Pet {
            ParamEyeBallForm is deliberately NOT written: psd2live's
            PhysicsEyeJelly owns it (driven by ParamEyeL/ROpen, scale 0.32). ---- */
     const open = clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
-    if (!this._isParamFixed(P.eyeLOpen)) st.scaleParam(core, P.eyeLOpen, open)
-    if (!this._isParamFixed(P.eyeROpen)) st.scaleParam(core, P.eyeROpen, open)
+    this._writeEyeOpen(core, P.eyeLOpen, open)
+    this._writeEyeOpen(core, P.eyeROpen, open)
 
     st.setParam(core, P.browLY, clamp(emo.browY, -1, 1))
     st.setParam(core, P.browRY, clamp(emo.browY, -1, 1))
@@ -524,6 +542,8 @@ export class Pet {
 
   /** Semantic reactions used by chat, petting and voice events. */
   react(kind) {
+    // 播放动作 is off: no motion may start, whatever asked for it.
+    if (this.settings?.idle?.motionsEnabled === false) return Promise.resolve(false)
     const groups = this.stage.getUsableMotionGroups()
     const has = (g) => groups.some((x) => x.toLowerCase() === g.toLowerCase())
     const run = (g) => (has(g) ? this.playMotion(g) : Promise.resolve(false))

@@ -50,6 +50,7 @@
     "breath": true,
     "breathSpeed": 1,
     "physics": true,
+    "motionsEnabled": true,
     "autoMotion": true,
     "motionMin": 20,
     "motionMax": 45,

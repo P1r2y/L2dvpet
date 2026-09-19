@@ -33,9 +33,23 @@ export class QuickDock {
   }
 
   show() {
+    if (this.enabled === false) return
     this.el.classList.remove('hidden')
     this.el.classList.add('visible')
     this._follow()
+  }
+
+  /**
+   * 设置 → 界面 → 显示快捷按钮条. Off means the dock never appears — not just
+   * hidden right now, so a later hover cannot bring it back.
+   */
+  setEnabled(on) {
+    this.enabled = on !== false
+    if (!this.enabled) {
+      this.stop()
+      this.el.classList.remove('visible')
+      this.el.classList.add('hidden')
+    }
   }
 
   hide() {

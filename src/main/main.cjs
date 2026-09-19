@@ -337,6 +337,23 @@ function createTray() {
   tray.on('double-click', () => showAndSend({ type: 'open-chat' }))
 }
 
+/**
+ * 设置 → 显示 → 显示托盘图标. Hiding the tray is safe: the window can still be
+ * brought back with Ctrl+Shift+H or from the pet's own menus.
+ */
+function setTrayEnabled(enabled) {
+  if (enabled) {
+    if (!tray) createTray()
+  } else if (tray) {
+    try {
+      tray.destroy()
+    } catch {
+      /* already gone */
+    }
+    tray = null
+  }
+}
+
 function toggleVisibility() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow()
@@ -371,6 +388,9 @@ function registerIpc() {
         const d = pickDisplay()
         mainWindow && mainWindow.setBounds(d.bounds)
       }
+      if ('showTray' in partial.display) {
+        setTrayEnabled(next.display.showTray !== false)
+      }
     }
     refreshTray()
     return next
@@ -380,6 +400,7 @@ function registerIpc() {
     if (mainWindow) {
       mainWindow.setAlwaysOnTop(next.display.alwaysOnTop, next.display.alwaysOnTopLevel || 'screen-saver')
     }
+    setTrayEnabled(next.display?.showTray !== false)
     refreshTray()
     return next
   })
@@ -1409,6 +1430,71 @@ async function runSelftest() {
     )
   }
 
+  /*
+   * Auto-blink off must actually stop blinking.
+   *
+   * The model's own Idle motion bakes a blink into every 6 s loop (2.780 s → 0),
+   * so honouring the setting means the app has to take the eye-open channels
+   * over instead of scaling what the motion left there. Sample past a full loop
+   * so a single baked blink cannot slip between samples.
+   */
+  {
+    const priorAutoBlink = await wc
+      .executeJavaScript(`window.__petTest.settings()?.idle?.autoBlink`, true)
+      .catch(() => null)
+    await wc.executeJavaScript(`window.__petTest.setSettings({ idle: { autoBlink: false } })`, true)
+    await new Promise((r) => setTimeout(r, 400))
+    let minL = 1
+    let minR = 1
+    let n = 0
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < 7200) {
+      const st = await params()
+      if (st) {
+        n++
+        if (st.eyeLOpen < minL) minL = st.eyeLOpen
+        if (st.eyeROpen < minR) minR = st.eyeROpen
+      }
+      await new Promise((r) => setTimeout(r, 60))
+    }
+    const quiet = minL > 0.98 && minR > 0.98
+    console.log(
+      `[selftest] 关自动眨眼 ${quiet ? 'PASS' : 'FAIL'} — 7.2s 内最低 睁眼L=${minL.toFixed(3)} 睁眼R=${minR.toFixed(3)}，${n} 次采样（应全程 ≥0.98）`
+    )
+    await wc.executeJavaScript(
+      `window.__petTest.setSettings({ idle: { autoBlink: ${priorAutoBlink === false ? 'false' : 'true'} } })`,
+      true
+    )
+  }
+
+  /*
+   * Settings that were declared in the UI but reached no consumer until now.
+   * Assert the two that are observable from here so they cannot go dead again
+   * without a red line; 显示托盘图标 is not observable because the self-test
+   * never creates a tray in the first place.
+   */
+  {
+    await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { dockVisible: false } })`, true)
+    await new Promise((r) => setTimeout(r, 300))
+    const dockOff = await wc.executeJavaScript(`window.__petTest.dockHidden()`, true).catch(() => null)
+
+    await wc
+      .executeJavaScript(`window.__petTest.setSettings({ idle: { motionsEnabled: false } })`, true)
+    await new Promise((r) => setTimeout(r, 500))
+    const groupOff = await wc.executeJavaScript(`window.__petTest.idleMotionGroup()`, true).catch(() => null)
+
+    await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { dockVisible: true } })`, true)
+    await wc
+      .executeJavaScript(`window.__petTest.setSettings({ idle: { motionsEnabled: true } })`, true)
+    await new Promise((r) => setTimeout(r, 400))
+    const groupOn = await wc.executeJavaScript(`window.__petTest.idleMotionGroup()`, true).catch(() => null)
+
+    const ok = dockOff === true && groupOff !== 'Idle' && groupOn === 'Idle'
+    console.log(
+      `[selftest] 开关落实 ${ok ? 'PASS' : 'FAIL'} — 快捷条关后隐藏=${dockOff}；播放动作关后 idle 组=${JSON.stringify(groupOff)}，开回后=${JSON.stringify(groupOn)}`
+    )
+  }
+
   try {
     console.log('[selftest] diag', JSON.stringify(await diag()))
   } catch (err) {
@@ -1464,7 +1550,7 @@ if (!gotLock) {
     // The tray icon and global shortcuts would intrude on the user's desktop,
     // so neither is created while self-testing.
     if (!isSelftest) {
-      createTray()
+      setTrayEnabled(settings.get().display?.showTray !== false)
       registerFixedShortcuts()
       registerSttHotkey(settings.get().voice.sttHotkey)
     }
