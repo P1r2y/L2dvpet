@@ -72,6 +72,8 @@ export class PetStage {
 
     PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker)
     if (PIXI.settings) PIXI.settings.FAIL_IF_MAJOR_PERFORMANCE_CAVEAT = false
+    // Must precede Live2DModel.from — the library preloads every motion there.
+    installEyeCurvePatch()
 
     const rect = { width: window.innerWidth, height: window.innerHeight }
     this.layerWidth = 320
@@ -634,4 +636,59 @@ export class PetStage {
     this.model = null
     this.ready = false
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Eye-channel ownership
+ * ------------------------------------------------------------------ */
+
+/** Channels the app drives itself; no motion may blink them behind our back. */
+const EYE_OPEN_IDS = new Set(['ParamEyeLOpen', 'ParamEyeROpen'])
+
+/**
+ * Flattens the idle motion's eye-open curves to "fully open" as it loads.
+ *
+ * Blinking belongs to the app (see `Pet._writeEyeOpen`). A model whose idle
+ * motion has a blink baked into its loop — this one blinks at 2.780 s of every
+ * 6 s — otherwise keeps blinking with 自动眨眼 switched off, and the only way to
+ * cancel that from the outside is to overwrite the eye channels after the fact,
+ * which also throws away authored detail such as the nod motion's 0.75
+ * eye-press. Rewriting the idle curves costs nothing else: a curve's keyframes
+ * are contiguous — the first segment's `basePointIndex` through to the keyframe
+ * after the last segment — so neighbouring curves are never touched.
+ *
+ * Installed before the model is built, because the library preloads every motion
+ * at that point.
+ */
+function installEyeCurvePatch() {
+  const factory = PIXI?.live2d?.Live2DFactory
+  if (!factory || factory.__eyeCurvePatched) return
+  const load = factory.loadMotion.bind(factory)
+  factory.loadMotion = async (motionManager, group, index) => {
+    const motion = await load(motionManager, group, index)
+    try {
+      const name = String(group || '').toLowerCase()
+      const configured = String(motionManager?.groups?.idle || '').toLowerCase()
+      const md = motion?._motionData
+      if (md?.curves && (name === 'idle' || name === configured)) {
+        for (const curve of md.curves) {
+          if (!EYE_OPEN_IDS.has(curve.id)) continue
+          const segs = (md.segments || []).slice(
+            curve.baseSegmentIndex,
+            curve.baseSegmentIndex + curve.segmentCount
+          )
+          if (!segs.length) continue
+          const starts = segs.map((s) => s.basePointIndex)
+          const first = Math.min(...starts)
+          const last = Math.max(...starts) + 1
+          const pointCount = md.points?.length || 0
+          for (let i = first; i <= last && i < pointCount; i++) md.points[i].value = 1
+        }
+      }
+    } catch {
+      /* a motion we cannot read is used exactly as loaded */
+    }
+    return motion
+  }
+  factory.__eyeCurvePatched = true
 }

@@ -1461,6 +1461,21 @@ async function runSelftest() {
     console.log(
       `[selftest] 关自动眨眼 ${quiet ? 'PASS' : 'FAIL'} — 7.2s 内最低 睁眼L=${minL.toFixed(3)} 睁眼R=${minR.toFixed(3)}，${n} 次采样（应全程 ≥0.98）`
     )
+    /*
+     * The flip side: suppressing blinking must not flatten authored motion
+     * detail — the Nod curve presses the eyes to 0.75 and that has to reach the
+     * model. Reported, not asserted: the observed minimum in this window is
+     * consistently lower (≈0.31) than the press predicts (0.75 × eyeScale ≈
+     * 0.62), so something else still attenuates the channel after the motion
+     * releases it. Printing the number keeps the signal visible without
+     * encoding an expectation we cannot yet justify.
+     */
+    const nod = await wc
+      .executeJavaScript(`window.__petTest.testReaction('nod')`, true)
+      .catch((e) => ({ error: e.message }))
+    console.log(
+      `[selftest] 动作眯眼（信息）— 关自动眨眼时 Nod 的睁眼最低=${nod?.eyeMin}（动作作者写 0.75，乘上 smile 的 0.9 预期约 0.62；0.98 以上说明压眼被完全盖掉）`
+    )
     await wc.executeJavaScript(
       `window.__petTest.setSettings({ idle: { autoBlink: ${priorAutoBlink === false ? 'false' : 'true'} } })`,
       true

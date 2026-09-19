@@ -48,6 +48,9 @@ export class Pet {
     /** Parameters as applied to the model this frame (see _applyParameters). */
     this.applied = null
     this._captureApplied = false
+    /** Eye-open composition: what a motion authored, and what we last wrote. */
+    this._eyeBase = {}
+    this._eyeWritten = {}
     /** Own breathing oscillator (the library's built-in breath is detached). */
     this.breathPhase = 0
     this._lastDt = 1 / 60
@@ -334,6 +337,18 @@ export class Pet {
       }
     }
     const open = clamp(this.blinkValue * this.emotion.eyeScale, 0, 1)
+    for (const id of [P.eyeLOpen, P.eyeROpen]) {
+      /*
+       * Runs immediately after the motion manager, which is the only moment the
+       * channels hold what a motion authored rather than what we wrote. Capture
+       * that as the base; multiplying it later is stable, whereas multiplying
+       * the live value in place is not — a channel nothing rewrites (playback
+       * off, motion finished) decays geometrically to 0 and the eyes shut.
+       */
+      const raw = this.stage.getParam(core, id)
+      const last = this._eyeWritten?.[id]
+      this._eyeBase[id] = last !== undefined && Math.abs(raw - last) < 1e-4 ? 1 : raw
+    }
     this._writeEyeOpen(core, P.eyeLOpen, open)
     this._writeEyeOpen(core, P.eyeROpen, open)
     this._applyManual(core, 'early')
@@ -342,20 +357,22 @@ export class Pet {
   /**
    * Writes one eye-open channel.
    *
-   * Multiplying preserves whatever a motion authored for it: the Nod curve
-   * presses the eyes to 0.75, and the model's own Idle motion has a blink baked
-   * into every 6 s loop (2.780 s → 0). That is what we want while auto-blink is
-   * on. It is exactly what we cannot have while it is off — a multiply can never
-   * cancel a motion that drives the channel to 0 on its own, which is why
-   * turning 自动眨眼 off still blinked. In that mode the app owns the channel
-   * outright, so nothing blinks it.
+   * The value is `base × open`, where `base` is what a motion authored this
+   * frame (captured in `_applyEarlyParameters`, defaulting to fully open) and
+   * `open` is the app's own blink/expression factor. Writing the product
+   * outright — rather than scaling the live value in place — is what keeps
+   * authored detail (the Nod curve presses the eyes to 0.75) *and* stays stable
+   * when nothing rewrites the channel.
    *
-   * A pinned parameter is left alone either way — 固定 means fixed.
+   * A pinned parameter is left alone — 固定 means fixed.
    */
   _writeEyeOpen(core, id, open) {
     if (this._isParamFixed(id)) return
-    if (this.settings?.idle?.autoBlink === false) this.stage.setParam(core, id, open)
-    else this.stage.scaleParam(core, id, open)
+    const base = this._eyeBase?.[id] ?? 1
+    const value = clamp(base * open, 0, 1)
+    this.stage.setParam(core, id, value)
+    if (!this._eyeWritten) this._eyeWritten = {}
+    this._eyeWritten[id] = value
   }
 
   /**
