@@ -3,7 +3,7 @@
  * Verifies the voice layer end to end at the synthesis boundary:
  *   - which engines exist on this machine
  *   - language detection + per-language voice profile resolution
- *   - the Roxy presets produce the intended voice for each language
+ *   - the local presets produce the intended voice for each language
  *   - pitch-shift ("声线") compensation
  *
  *   node scripts/tools/test-voice.cjs
@@ -12,7 +12,19 @@ const tts = require('../../src/main/lib/tts.cjs')
 const gptsovits = require('../../src/main/lib/gptsovits.cjs')
 const vp = require('../../src/main/lib/voice-profile.cjs')
 const defaults = require('../../src/shared/defaults.json')
-const presets = require('../../src/shared/voice-presets.json').presets
+const presets = readPresets()
+
+/**
+ * The preset file is local-only (voice content is not distributed), so it may
+ * simply not be there — the script then just has nothing to test.
+ */
+function readPresets() {
+  try {
+    return require('../../src/shared/voice-presets.json').presets || []
+  } catch {
+    return []
+  }
+}
 const fs = require('node:fs')
 const path = require('node:path')
 
@@ -33,11 +45,14 @@ function userSettings() {
 }
 
 const SAMPLES = {
-  'zh-CN': '你好，我是洛琪希·米格路迪亚，从今天起由我来教你魔术。',
-  'ja-JP': 'こんにちは、私はロキシー・ミグルディアです。これから魔法を教えますね。',
-  'en-US': 'Hello, I am Roxy Migurdia. I will be teaching you magic from today.',
+  'zh-CN': '你好，这是当前音色的试听，一二三四五六七八九十。',
+  'ja-JP': 'こんにちは、これは現在の声のサンプルです。',
+  'en-US': 'Hello, this is a sample of the current voice.',
 }
 const TEXT = SAMPLES['zh-CN']
+
+/** 合成用例走哪个预设：有本地预设就用第一个，没有就按当前设置来。 */
+const BASE_PRESET = presets.length ? presets[0].id : ''
 
 function wavInfo(buf) {
   if (buf.length < 44 || buf.toString('latin1', 0, 4) !== 'RIFF') return null
@@ -76,7 +91,10 @@ function settingsFor(presetId) {
 
   /* ── language profiles ───────────────────────────────────────────── */
   console.log('\n=== 每个预设 × 每种语言，实际会选到什么音色 ===')
-  for (const presetId of ['roxy-ja', 'roxy-zh', 'roxy-auto']) {
+  if (!presets.length) {
+    console.log('  （没有 voice-presets.json —— 声线预设是本地文件，不随仓库分发，跳过）')
+  }
+  for (const presetId of presets.map((p) => p.id)) {
     const s = settingsFor(presetId)
     console.log(`\n[${presetId}]  languageMode=${s.voice.languageMode}  pitch=${s.voice.pitchShift}`)
     for (const [lang, text] of Object.entries(SAMPLES)) {
@@ -93,7 +111,7 @@ function settingsFor(presetId) {
   /* ── real synthesis through the resolved profile ─────────────────── */
   console.log('\n=== 真实合成（走 profile 解析 + 音调补偿）===')
   for (const lang of ['zh-CN', 'ja-JP', 'en-US']) {
-    const s = settingsFor('roxy-auto')
+    const s = settingsFor(BASE_PRESET)
     s.voice.languageMode = lang // pin so we can check one language at a time
     const t0 = Date.now()
     const { result, failed } = await tts.synthesizeWithFallback(s, SAMPLES[lang])
@@ -110,10 +128,10 @@ function settingsFor(presetId) {
   }
 
   /* ── pitch compensation ──────────────────────────────────────────── */
-  console.log('\n=== 音调补偿（洛琪希设定 1.15）===')
+  console.log('\n=== 音调补偿（1.15 为「年轻女声」档）===')
   const rows = []
   for (const pitch of [0.85, 1.0, 1.15, 1.35]) {
-    const s = settingsFor('roxy-auto')
+    const s = settingsFor(BASE_PRESET)
     s.voice.languageMode = 'zh-CN'
     s.voice.pitchShift = pitch
     const { result } = await tts.synthesizeWithFallback(s, TEXT)
@@ -139,7 +157,7 @@ function settingsFor(presetId) {
   console.log('\n=== 边界情况 ===')
   const off = await tts.synthesizeWithFallback(merge(defaults, { voice: { ttsProvider: 'off' } }), '不该有声音')
   console.log(`  ttsProvider=off -> kind=${off.result.kind} (应为 none)`)
-  const auto = await tts.synthesizeWithFallback(settingsFor('roxy-auto'), SAMPLES['ja-JP'])
+  const auto = await tts.synthesizeWithFallback(settingsFor(BASE_PRESET), SAMPLES['ja-JP'])
   console.log(
     `  auto + 日语文本 -> 引擎=${auto.result.provider} 判定=${auto.result.detected}` +
       (auto.failed.length ? `  跳过: ${auto.failed.map((f) => f.provider).join(',')}` : '')

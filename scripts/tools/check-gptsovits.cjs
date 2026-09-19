@@ -1,7 +1,7 @@
 'use strict'
 /**
  * Checks whether a GPT-SoVITS api_v2 service is reachable and whether the
- * configured Roxy model files exist on disk.
+ * configured weight / reference-audio files exist on disk.
  *
  *   node scripts/tools/check-gptsovits.cjs [baseUrl] [gptWeights] [sovitsWeights]
  *
@@ -58,7 +58,7 @@ function checkFile(label, p) {
   if (probe.ok) {
     console.log('\n试合成:')
     try {
-      const buf = await gsv.synthesize('你好，我是洛琪希·米格路迪亚。', {
+      const buf = await gsv.synthesize('你好，这是当前音色的试听。', {
         baseUrl,
         useWeights: cfg.mode === 'weights',
         gptWeights: process.argv[3] || cfg.gptWeights,
@@ -79,6 +79,6 @@ function checkFile(label, p) {
     }
   }
 
-  console.log('\n若需要模型：哔哩哔哩 BV1HfF6zNEK8（独孤欲雪 分享的洛琪希 GPT-SoVITS 模型，RoxyPro）')
-  console.log('解压密码 Roxy0721；解压后把 GPT 权重与 SoVITS 权重路径填进设置 → 语音 → GPT-SoVITS。')
+  console.log('\n若还没有权重：用自己的 GPT-SoVITS 微调权重，或用「参考音频」模式做零样本克隆。')
+  console.log('把 GPT 权重 / SoVITS 权重（或参考音频）路径填进 设置 → 语音 → GPT-SoVITS。')
 })()

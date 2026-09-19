@@ -9,6 +9,20 @@ scripts/selftest-*.png
 scripts/**/*.mp3
 scripts/**/*.wav
 
+# 本地素材与内容：不随仓库分发，克隆后需自备
+#   模型与美术、音色试听、声线预设都只留在这台机器上
+assets/model/
+docs/source/
+docs/voice-demo/
+src/shared/voice-presets.json
+
+# 演示过具体角色的截图：README 改用设置面板截图
+docs/screenshots/screenshot-desktop.png
+docs/screenshots/screenshot-petting.png
+docs/screenshots/screenshot-chat.png
+docs/screenshots/screenshot-voice.png
+docs/screenshots/screenshot-gptsovits.png
+
 # 编辑器 / 系统
 .vscode/
 .idea/

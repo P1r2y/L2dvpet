@@ -1275,6 +1275,26 @@ async function runSelftest() {
     }
   }
 
+  /*
+   * GPT-SoVITS 的 GBK 过滤是个隐晦的 workaround（见 gptsovits.cjs 注释）：
+   * 服务端编码不了的字符会让整条请求失败，改成空格后必须仍有声音。
+   * 这里把它钉死，免得日后被顺手"简化"掉。
+   */
+  {
+    const cases = [
+      ['ロキシー・ミグルディア', 'ロキシー ミグルディア', '无 GBK 编码的间隔号'],
+      ['星★と→と①', '星★と→と①', '有 GBK 编码的符号应原样保留'],
+      ['あ💧い', 'あ い', 'emoji（星平面）'],
+    ]
+    const bad = cases.filter(([input, want]) => gptsovits.toGbkSafe(input) !== want)
+    console.log(
+      `[selftest] GBK 过滤 ${bad.length ? 'FAIL' : 'PASS'} — ${cases.length - bad.length}/${cases.length}` +
+        (bad.length
+          ? ` 不符: ${bad.map(([i]) => i).join(' / ')}`
+          : `（编码表 ${gptsovits.GBK_CHARS ? gptsovits.GBK_CHARS.size : 'N/A'} 字）`)
+    )
+  }
+
   try {
     console.log('[selftest] diag', JSON.stringify(await diag()))
   } catch (err) {

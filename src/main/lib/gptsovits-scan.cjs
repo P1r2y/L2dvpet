@@ -20,7 +20,6 @@ function candidateRoots() {
     'E:\\GPT-SoVITS',
     path.join(home, 'GPT-SoVITS'),
     path.join(home, 'Documents', 'GPT-SoVITS'),
-    path.join(desktop, 'work', 'aiL2d', 'GPT-SoVITS'),
   ]
   return out.filter((p, i) => out.indexOf(p) === i)
 }

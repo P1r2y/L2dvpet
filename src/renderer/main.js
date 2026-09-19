@@ -92,13 +92,24 @@ async function boot() {
     app.pet = pet
     pet.pos = { x: state.petPos?.x ?? 0.8, y: state.petPos?.y ?? 1.0 }
 
-    await pet.load({
-      canvas: $('#stage'),
-      layer: $('#pet-layer'),
-      fxLayer: $('#fx-layer'),
-      modelUrl: new URL(`../${settings.model.path}`, location.href).href,
-      onProgress: setProgress,
-    })
+    try {
+      await pet.load({
+        canvas: $('#stage'),
+        layer: $('#pet-layer'),
+        fxLayer: $('#fx-layer'),
+        modelUrl: new URL(`../${settings.model.path}`, location.href).href,
+        onProgress: setProgress,
+      })
+    } catch (err) {
+      // 模型是自备素材：仓库里不带，所以「没模型 / 路径写错」是最常见的首次启动状况，
+      // 这里把原始报错（多半只是一句 fetch 失败）换成能照着做的提示。
+      const p = String(settings.model.path || '').trim()
+      throw new Error(
+        p
+          ? `加载 Live2D 模型失败：${p}（${err?.message || err}）。请在「设置 → 显示 → 模型路径」里改成一个存在的 .model3.json。`
+          : '还没有指定 Live2D 模型。请在「设置 → 显示 → 模型路径」里填上你自己的 .model3.json 路径。'
+      )
+    }
 
     setProgress('准备就绪')
     pet.applySettings(app.settings)
@@ -723,7 +734,7 @@ async function boot() {
          * End-to-end GPT-SoVITS check: detect the install, apply the found
          * configuration, speak, and report which engine actually produced audio.
          */
-        testGptsovits: async (text = '你好，我是洛琪希·米格路迪亚。') => {
+        testGptsovits: async (text = '你好，这是当前音色的试听。') => {
           const scan = await bridge.tts.scanGptsovits({})
           if (!scan?.root) return { ok: false, step: 'scan', message: '未找到 GPT-SoVITS 安装目录' }
 

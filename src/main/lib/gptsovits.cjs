@@ -2,13 +2,13 @@
 /**
  * GPT-SoVITS client (api_v2).
  *
- * This is the path to a *real* 洛琪希 voice: the community has published a
- * fine-tuned GPT + SoVITS model for her ("洛琪希 GSV 模型 / RoxyPro"), and
- * GPT-SoVITS is a small local HTTP service, so the pet can use it directly.
- * Nothing is bundled or downloaded here — the app only talks to the API.
+ * GPT-SoVITS is a local voice-cloning service: hand it a fine-tuned GPT +
+ * SoVITS weight pair（常驻模型）or a short reference clip（零样本克隆）, and it
+ * speaks in that voice. It runs as a small local HTTP service, so the pet can
+ * call it directly. Nothing is bundled or downloaded here — the app only
+ * talks to the API.
  *
- * Reference: https://www.bilibili.com/video/BV1HfF6zNEK8 (model + tutorial)
- *            https://github.com/RVC-Boss/GPT-SoVITS
+ * Reference: https://github.com/RVC-Boss/GPT-SoVITS
  *
  * Endpoints used:
  *   GET  /tts?text=..&text_lang=..&ref_audio_path=..&prompt_text=..&prompt_lang=..
@@ -93,13 +93,65 @@ async function setWeights(baseUrl, { gptWeights, sovitsWeights }) {
 }
 
 /**
+ * GPT-SoVITS 服务端在 Windows 上以 GBK 处理文本：凡是**没有 GBK 编码**的字符，
+ * 都会让整条请求以 400/500 失败（服务端报 `'gbk' codec can't encode character …`）。
+ * 实测触发字符包括「ロキシー・ミグルディア」的间隔号 U+30FB、♪ ♥ ✓ ©，以及全部 emoji；
+ * 而 ★ → ① ℃ … 这些有 GBK 编码的符号一切正常 —— 规则与 GBK 编码能力逐字符吻合。
+ *
+ * Node 没有 GBK 编码器，但 `TextDecoder('gbk')` 可以反向枚举出全部 23939 个可编码字符，
+ * 运行时构建一次即可得到精确集合（与 Python 的 gbk 编解码器逐字符一致）。
+ */
+const GBK_CHARS = (() => {
+  try {
+    const dec = new TextDecoder('gbk', { fatal: true })
+    const set = new Set()
+    const pair = new Uint8Array(2)
+    for (let lead = 0x81; lead <= 0xfe; lead++) {
+      for (let trail = 0x40; trail <= 0xfe; trail++) {
+        if (trail === 0x7f) continue
+        pair[0] = lead
+        pair[1] = trail
+        try {
+          const s = dec.decode(pair)
+          if (s) set.add(s)
+        } catch {
+          /* 不是合法 GBK 字节对 */
+        }
+      }
+    }
+    return set.size > 0 ? set : null
+  } catch {
+    return null // 运行时不带 GBK 支持 → 原样返回，不做处理
+  }
+})()
+
+/**
+ * 把服务端编码不了的字符换成空格（保住断词），并合并因此产生的连续空白。
+ * 只影响真正发给服务的文本；聊天气泡与历史记录里显示的原样保留。
+ */
+function toGbkSafe(text) {
+  if (!GBK_CHARS) return text
+  let out = ''
+  let replaced = 0
+  for (const ch of text) {
+    if (ch.codePointAt(0) < 0x80 || GBK_CHARS.has(ch)) out += ch
+    else {
+      out += ' '
+      replaced += 1
+    }
+  }
+  if (!replaced) return text
+  return out.replace(/[ \t]{2,}/g, ' ').trim()
+}
+
+/**
  * Synthesizes to a WAV buffer.
  * @param {string} text
  * @param {object} opts
  * @returns {Promise<Buffer>}
  */
 async function synthesize(text, opts = {}) {
-  const clean = String(text || '').trim()
+  const clean = toGbkSafe(String(text || '').trim())
   if (!clean) return Buffer.alloc(0)
   const base = normaliseBase(opts.baseUrl)
 
@@ -166,4 +218,14 @@ function resetWeightsCache() {
   global.__petGsvWeights = null
 }
 
-module.exports = { synthesize, probe, setWeights, resetWeightsCache, REF_MODES, TEXT_LANGS, DEFAULT_BASE_URL }
+module.exports = {
+  synthesize,
+  probe,
+  setWeights,
+  resetWeightsCache,
+  toGbkSafe,
+  GBK_CHARS,
+  REF_MODES,
+  TEXT_LANGS,
+  DEFAULT_BASE_URL,
+}

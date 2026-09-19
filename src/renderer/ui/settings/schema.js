@@ -375,7 +375,7 @@ export const SETTINGS_TREE = [
         fields: [
           INFO(
             'gsv-info',
-            '洛琪希专用微调模型（BV1HfF6zNEK8 的 RoxyPro）下载后放进 GPT_weights_v2ProPlus / SoVITS_weights_v2ProPlus，点「自动检测」即可自动填好路径。没装微调模型时，可以先用「参考音频」模式做零样本克隆。'
+            '想用常驻模型：把微调好的 GPT 权重与 SoVITS 权重分别放进 GPT_weights_v2ProPlus / SoVITS_weights_v2ProPlus，点「自动检测」即可自动填好路径。没有微调权重时，可以先用「参考音频」模式做零样本克隆。'
           ),
           TXT('voice.gptsovits.root', '安装目录', { wide: true }),
           SW('voice.gptsovits.autoStart', '启动桌宠时自动运行'),
@@ -386,7 +386,7 @@ export const SETTINGS_TREE = [
           RESULT('gsv-result'),
           TXT('voice.gptsovits.baseUrl', '服务地址', { wide: true }),
           SEL('voice.gptsovits.mode', '参考方式', [
-            { value: 'weights', label: '常驻模型（微调好的洛琪希模型）' },
+            { value: 'weights', label: '常驻模型（微调好的权重）' },
             { value: 'audio', label: '参考音频（零样本克隆）' },
           ]),
           TXT('voice.gptsovits.gptWeights', 'GPT 权重路径', { wide: true }),

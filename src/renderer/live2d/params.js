@@ -1,7 +1,7 @@
 /**
  * Parameter contract for models produced by **psd2live**.
  *
- * Source of truth: `aiL2d/psd2live/docs/zh/spec/DEFORMER_AND_PARAMETER_SPEC.md`
+ * Source of truth: `psd2live/docs/zh/spec/DEFORMER_AND_PARAMETER_SPEC.md`
  * ("Cubism 标准参数清单与映射表") and `core/MotionGenerator.kt`.
  *
  * Two things matter to the runtime:

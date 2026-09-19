@@ -166,6 +166,31 @@ writeFileSync(join(DIST, 'app.png'), makeTrayIcon(256))
  * `window.PIXI.live2d` are the exact objects the library expects. Only the
  * app's own ES modules are bundled.
  * ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ * Optional preset file
+ *
+ * `src/shared/voice-presets.json` holds the local one-click voice presets.
+ * It is deliberately NOT part of the repository — voice content stays on the
+ * machine that made it. The renderer imports it statically, so without this
+ * plugin a fresh clone would fail to build; here the import resolves to an
+ * empty preset list when the file is absent.
+ * ------------------------------------------------------------------ */
+const PRESETS_FILE = join(ROOT, 'src', 'shared', 'voice-presets.json')
+
+const optionalVoicePresets = {
+  name: 'optional-voice-presets',
+  setup(b) {
+    b.onResolve({ filter: /voice-presets\.json$/ }, () => ({
+      path: PRESETS_FILE,
+      namespace: 'voice-presets',
+    }))
+    b.onLoad({ filter: /.*/, namespace: 'voice-presets' }, () => ({
+      contents: existsSync(PRESETS_FILE) ? readFileSync(PRESETS_FILE, 'utf8') : '{"presets":[]}',
+      loader: 'json',
+    }))
+  },
+}
+
 const buildOptions = {
   entryPoints: [join(ROOT, 'src', 'renderer', 'main.js')],
   bundle: true,
@@ -181,6 +206,7 @@ const buildOptions = {
     global: 'globalThis',
   },
   loader: { '.css': 'css' },
+  plugins: [optionalVoicePresets],
   // PIXI / PIXI.live2d come from the vendor scripts loaded before the bundle.
   external: [],
 }

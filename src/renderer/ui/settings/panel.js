@@ -854,7 +854,7 @@ export class SettingsPanel {
         break
       case 'test-tts-zh':
         await this._withBusy(btn, () =>
-          this._testTtsLang('zh-CN', '你好，我是洛琪希·米格路迪亚。今天也一起加油吧。')
+          this._testTtsLang('zh-CN', '你好，这是当前音色的试听。')
         )
         break
       case 'refresh-tts':
@@ -1171,7 +1171,7 @@ export class SettingsPanel {
   async _testTts(btn) {
     this._result('tts-result', '合成中…')
     const ok = await this.voice.speak(
-      `你好，我是${this.getSettings().chat?.personaName || '洛琪希'}，这是当前音色的试听。`,
+      `你好，我是${this.getSettings().chat?.personaName || '小助手'}，这是当前音色的试听。`,
       { force: true }
     )
     const d = this.voice.debug
