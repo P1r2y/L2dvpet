@@ -176,8 +176,10 @@ B 站 [**BV1HfF6zNEK8**](https://www.bilibili.com/video/BV1HfF6zNEK8/)（UP：�
 
 #### 安装位置与状态
 
+下文用 `<GPT-SoVITS 根目录>` 指代你自己的 GPT-SoVITS 安装目录，整合包解压后形如：
+
 ```
-C:\Users\Administrator\Desktop\work\GPT-SoVITS\GPT-SoVITS-v2pro-20250604\
+<GPT-SoVITS 根目录>\GPT-SoVITS-v2pro-20250604\
 ```
 
 | 项目 | 状态 |
@@ -194,7 +196,7 @@ C:\Users\Administrator\Desktop\work\GPT-SoVITS\GPT-SoVITS-v2pro-20250604\
 
 ```powershell
 # 只启动 API（桌宠只需要这个）
-powershell -ExecutionPolicy Bypass -File "C:\Users\Administrator\Desktop\work\GPT-SoVITS\GPT-SoVITS-v2pro-20250604\start-gptsovits-api.ps1"
+powershell -ExecutionPolicy Bypass -File "<GPT-SoVITS 根目录>\GPT-SoVITS-v2pro-20250604\start-gptsovits-api.ps1"
 
 # 或者启动完整 WebUI（含训练/推理界面，也会开 API）
 双击安装目录里的 go-webui.bat
@@ -612,7 +614,7 @@ const mouthSec = `
 也就是说这个模型是**从单页贴图重建导出的**，重建过程里嘴部画层的顶点/权重出了问题。
 **程序端无法修复** —— 需要拿源 PSD 重新导出一次。
 
-源 PSD 就在本机：\`C:\\Users\\Administrator\\Desktop\\work\\aiL2d\\psd\\seethrough_skirt_split.psd\`
+源 PSD 名为 `seethrough_skirt_split.psd`（不在本仓库内，重新导出时请自备）。
 
 #### 已经做的补救：让嘴张得更大
 
