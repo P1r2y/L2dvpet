@@ -1613,6 +1613,42 @@ async function runSelftest() {
     }
   }
 
+  /* ---- Interface language: switching it must actually swap the rendered UI ---- */
+  {
+    // The section id lives on the caret span, not on the row — read the label
+    // span that sits next to it.
+    const navLabel = (id) =>
+      wc.executeJavaScript(
+        `(() => {
+          const c = [...document.querySelectorAll('.vs-caret[data-section]')].find((el) => el.dataset.section === ${JSON.stringify(id)})
+          if (!c) return null
+          const label = [...c.parentElement.children].find((el) => !el.classList.contains('vs-caret'))
+          return label ? label.textContent.trim() : null
+        })()`,
+        true
+      )
+    const before = await wc
+      .executeJavaScript(`(window.__petTest.settings().ui || {}).language || 'auto'`, true)
+      .catch(() => 'auto')
+    await wc.executeJavaScript(`window.__petTest.openSettings()`, true)
+    await new Promise((r) => setTimeout(r, 400))
+
+    await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { language: 'en' } })`, true)
+    await new Promise((r) => setTimeout(r, 450))
+    const enLabel = await navLabel('display')
+
+    await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { language: 'zh-CN' } })`, true)
+    await new Promise((r) => setTimeout(r, 450))
+    const zhLabel = await navLabel('display')
+
+    console.log(
+      `[selftest] interface language ${enLabel === 'Display' && zhLabel === '显示' ? 'PASS' : 'FAIL'} — en="${enLabel}", zh="${zhLabel}"`
+    )
+    // Put the user's own setting back.
+    await wc.executeJavaScript(`window.__petTest.setSettings({ ui: { language: ${JSON.stringify(before)} } })`, true)
+    await new Promise((r) => setTimeout(r, 300))
+  }
+
   try {
     console.log('[selftest] diag', JSON.stringify(await diag()))
   } catch (err) {

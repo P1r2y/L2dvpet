@@ -145,6 +145,7 @@
     "sttHotkey": "CommandOrControl+Shift+Space"
   },
   "ui": {
+    "language": "auto",
     "accent": "#007acc",
     "panelOpacity": 0.98,
     "fontSize": 13,

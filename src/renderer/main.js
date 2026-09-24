@@ -12,6 +12,7 @@ import { EffectsLayer } from './features/fx.js'
 import { SfxService } from './features/sfx.js'
 import { PARAM_CATALOG } from './live2d/params.js'
 import { SpeechBubble } from './ui/bubble.js'
+import { setLang, t } from './core/i18n.js'
 import { ChatPanel } from './ui/chatPanel.js'
 import { SettingsPanel } from './ui/settings/panel.js'
 import { QuickDock } from './ui/dock.js'
@@ -156,6 +157,10 @@ async function boot() {
     })
     app.chatPanel.renderHistory(app.state.chatHistory)
 
+    // Interface language, applied before anything renders so the dock, the
+    // menus and the settings panel all start out in the same language.
+    setLang(app.settings.ui?.language)
+
     app.settingsPanel = new SettingsPanel({
       getSettings: () => app.settings,
       patchSettings: (partial) => patchSettings(partial),
@@ -268,6 +273,7 @@ async function boot() {
         },
         setSettings: async (partial) => {
           app.settings = await bridge.settings.patch(partial)
+          setLang(app.settings.ui?.language)
           app.pet.applySettings(app.settings)
           applyTheme()
           updateDockSpeakIcon()
@@ -290,8 +296,8 @@ async function boot() {
         stopSpeech: () => app.voice.stop(),
         bubble: (text) => app.bubble.show(text, { duration: 0, keep: true }),
         react: (kind) => app.pet.react(kind),
-        petVisual: (on, head) => app.pet.setPettingVisual(!!on, { head: !!head }),
         openChat: () => app.chatPanel.open(),
+        openSettings: () => app.settingsPanel.open(),
         /** Drives the gaze pointer directly (synthetic mouse moves are unreliable here). */
         setPointer: (x, y) => {
           app.pet.setPointer(x ?? null, y ?? null)
@@ -893,6 +899,10 @@ async function boot() {
 async function patchSettings(partial) {
   const next = await bridge.settings.patch(partial)
   app.settings = next
+  // Every settings write goes through here, so this is the one place that has
+  // to notice a language change — switching it re-renders the panel in place
+  // (via the i18n:changed event) and re-labels anything else that listens.
+  setLang(next.ui?.language)
   return next
 }
 

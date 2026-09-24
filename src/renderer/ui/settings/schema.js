@@ -37,6 +37,17 @@ const PROVIDER_OPTIONS = [
   { value: 'off', label: 'Off' },
 ]
 
+/**
+ * Interface language. `English` and `简体中文` are written as endonyms — a
+ * language picker should name each language in its own script, so neither of
+ * these is translated.
+ */
+const UI_LANG_OPTIONS = [
+  { value: 'auto', label: 'Follow system' },
+  { value: 'en', label: 'English' },
+  { value: 'zh-CN', label: '简体中文' },
+]
+
 const LANG_OPTIONS = [
   { value: 'auto', label: 'Auto-detect' },
   { value: 'zh-CN', label: 'Chinese (Mandarin)' },
@@ -149,6 +160,7 @@ export const SETTINGS_TREE = [
         id: 'appearance',
         label: 'Appearance',
         fields: [
+          F('ui.language', 'Language', { type: 'select', options: UI_LANG_OPTIONS }),
           F('ui.accent', 'Accent color', { type: 'color' }),
           RNG('ui.panelOpacity', 'Panel opacity', 0.4, 1, 0.01, '%', (v) => Math.round(v * 100)),
           RNG('ui.fontSize', 'UI font size', 11, 18, 0.5, 'px', (v) => v),

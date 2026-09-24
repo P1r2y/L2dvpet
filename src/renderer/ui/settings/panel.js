@@ -9,6 +9,7 @@ import { $, clamp, debounce, el } from '../../core/util.js'
 import { bus } from '../../core/bus.js'
 import { toast, toastErr, toastOk } from '../notify.js'
 import { SETTINGS_TREE, ALL_FIELDS } from './schema.js'
+import { t, setLang } from '../../core/i18n.js'
 
 /**
  * Demo sentences for the "preview voice" buttons, one per language the pet can
@@ -148,6 +149,12 @@ export class SettingsPanel {
     this._wire()
 
     bus.on('ui:open-settings', ({ section, group } = {}) => this.open(section, group))
+    // Switching the interface language re-renders in place, so the panel swaps
+    // live instead of only on the next open. render() itself calls setLang(),
+    // which only emits when the language actually changed — no loop.
+    bus.on('i18n:changed', () => {
+      if (this.visible) this.render()
+    })
   }
 
   /* ---------------------------------------------------------------- *
@@ -323,6 +330,9 @@ export class SettingsPanel {
    * Rendering
    * ---------------------------------------------------------------- */
   render() {
+    // The interface language is applied here rather than at boot so switching
+    // it in the panel takes effect on the spot — render() runs on every change.
+    setLang(this.getSettings().ui?.language)
     this._renderNav()
     this._renderContent()
     this._loadDynamicOptions()
@@ -352,7 +362,7 @@ export class SettingsPanel {
           dataset: { section: section.id },
           text: isOpen ? '▾' : '▸',
         }),
-        el('span', { text: section.label })
+        el('span', { text: t(section.label) })
       )
       this.nav.appendChild(row)
 
@@ -362,7 +372,7 @@ export class SettingsPanel {
         this.nav.appendChild(
           el('div', {
             class: `vs-nav-group${gActive ? ' active' : ''}`,
-            text: group.label,
+            text: t(group.label),
             onclick: () => {
               this.sectionId = section.id
               this.groupId = group.id
@@ -400,7 +410,7 @@ export class SettingsPanel {
 
   _matches(field, section, group, q) {
     if (!field.key) return false
-    const hay = `${section.label} ${group.label} ${field.label} ${field.key}`.toLowerCase()
+    const hay = `${t(section.label)} ${t(group.label)} ${t(field.label)} ${field.key}`.toLowerCase()
     return hay.includes(q)
   }
 
@@ -422,11 +432,11 @@ export class SettingsPanel {
     let count = 0
     for (const { section, groups, heading } of blocks) {
       if (heading) {
-        this.body.appendChild(el('h2', { class: 'vs-h1', text: section.label }))
-        const leaves = section.groups.map((g) => g.label).join(', ')
+        this.body.appendChild(el('h2', { class: 'vs-h1', text: t(section.label) }))
+        const leaves = section.groups.map((g) => t(g.label)).join(', ')
         if (leaves) this.body.appendChild(el('div', { class: 'vs-sub', text: leaves }))
       } else if (groups.length) {
-        this.body.appendChild(el('h2', { class: 'vs-h1', text: `${section.label} · ${groups[0].label}` }))
+        this.body.appendChild(el('h2', { class: 'vs-h1', text: `${t(section.label)} · ${t(groups[0].label)}` }))
         const sub = groups[0].sub
         if (sub) this.body.appendChild(el('div', { class: 'vs-sub', text: sub }))
       }
@@ -434,7 +444,7 @@ export class SettingsPanel {
       for (const group of groups) {
         // When a section is shown whole, each group gets its own small heading.
         if (heading && blocks.length && section.groups.length > 1) {
-          this.body.appendChild(el('div', { class: 'vs-h2', text: group.label }))
+          this.body.appendChild(el('div', { class: 'vs-h2', text: t(group.label) }))
         }
         for (const f of group.fields) {
           const row = this._renderField(f)
@@ -473,7 +483,7 @@ export class SettingsPanel {
     if (f.type === 'info') return el('div', { class: 'vs-info', id: f.id, text: f.text, html: f.html })
     if (f.type === 'buttons') {
       const box = el('div', { class: 'vs-buttons', id: f.id })
-      for (const b of f.items) box.appendChild(el('button', { class: 'vs-btn', text: b.label, dataset: { cmd: b.id } }))
+      for (const b of f.items) box.appendChild(el('button', { class: 'vs-btn', text: t(b.label), dataset: { cmd: b.id } }))
       return box
     }
     if (f.type === 'presets') {
@@ -489,14 +499,14 @@ export class SettingsPanel {
           )
         )
       }
-      return el('div', { class: 'vs-row vs-row-block' }, el('div', { class: 'vs-label', text: f.label || '' }), box)
+      return el('div', { class: 'vs-row vs-row-block' }, el('div', { class: 'vs-label', text: t(f.label) || '' }), box)
     }
 
     const locked = f.key ? this.isLocked(f.key) : false
     const row = el('div', { class: `vs-row${locked ? ' locked' : ''}${this._modified(f) ? ' modified' : ''}` })
 
     const head = el('div', { class: 'vs-label' })
-    head.appendChild(el('span', { class: 'vs-name', text: f.label }))
+    head.appendChild(el('span', { class: 'vs-name', text: t(f.label) }))
     if (f.key) {
       head.appendChild(el('span', { class: 'vs-key', text: f.key }))
       head.appendChild(
@@ -630,7 +640,7 @@ export class SettingsPanel {
         let matched = false
         for (const o of opts) {
           const ov = typeof o === 'object' ? o.value : o
-          const ol = typeof o === 'object' ? o.label : String(o)
+          const ol = typeof o === 'object' ? t(o.label) : String(o)
           const sel = String(ov) === String(value)
           if (sel) matched = true
           select.appendChild(el('option', { value: ov, text: ol, selected: sel }))
