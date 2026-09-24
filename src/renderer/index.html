@@ -7,12 +7,18 @@
       functions with `new Function`. Everything else stays locked to local
       app:// resources: no remote scripts, no remote connections from the
       renderer (LLM/TTS/STT all go through the main process).
+
+      Every user-visible string below is the English i18n key. The `data-i18n*`
+      attributes mark which part of the element is translatable and
+      `applyStaticI18n()` (ui/chatPanel.js) fills them at startup, then again on
+      every `i18n:changed`. The plain `title`/`placeholder`/`aria-label`
+      attributes stay as the English default for the moment before that runs.
     -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline' 'unsafe-eval'; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data: blob:; media-src 'self' app: data: blob:; connect-src 'self' app: data: blob:; font-src 'self' app: data:; object-src 'none'; base-uri 'none';"
     />
-    <title>Live2D Desktop Pet</title>
+    <title data-i18n="Live2D Desktop Pet">Live2D Desktop Pet</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -30,8 +36,8 @@
           <div class="bubble-tail"></div>
         </div>
         <div id="bubble-actions" class="bubble-actions hidden">
-          <button class="bubble-btn" data-bubble-action="speak" title="Speak again">🔊</button>
-          <button class="bubble-btn" data-bubble-action="close" title="Close">✕</button>
+          <button class="bubble-btn" data-bubble-action="speak" title="Speak again" data-i18n-title="Speak again">🔊</button>
+          <button class="bubble-btn" data-bubble-action="close" title="Close" data-i18n-title="Close">✕</button>
         </div>
       </div>
 
@@ -40,26 +46,26 @@
 
       <!-- ── Quick dock ─────────────────────────────────────────── -->
       <div id="dock" class="dock hidden">
-        <button class="dock-btn" data-action="chat" title="Open chat (C)"><span>💬</span></button>
-        <button class="dock-btn" data-action="mic" title="Hold to talk / click to toggle (M)"><span>🎤</span></button>
-        <button class="dock-btn" data-action="speak-toggle" title="Voice on/off">
+        <button class="dock-btn" data-action="chat" title="Open chat (C)" data-i18n-title="Open chat (C)"><span>💬</span></button>
+        <button class="dock-btn" data-action="mic" title="Hold to talk / click to toggle (M)" data-i18n-title="Hold to talk / click to toggle (M)"><span>🎤</span></button>
+        <button class="dock-btn" data-action="speak-toggle" title="Voice on/off" data-i18n-title="Voice on/off">
           <span id="dock-speak-icon">🔈</span>
         </button>
-        <button class="dock-btn" data-action="settings" title="Settings (S)"><span>⚙️</span></button>
-        <button class="dock-btn" data-action="hide" title="Hide pet (Ctrl+Shift+H)"><span>👁</span></button>
+        <button class="dock-btn" data-action="settings" title="Settings (S)" data-i18n-title="Settings (S)"><span>⚙️</span></button>
+        <button class="dock-btn" data-action="hide" title="Hide pet (Ctrl+Shift+H)" data-i18n-title="Hide pet (Ctrl+Shift+H)"><span>👁</span></button>
       </div>
 
       <!-- ── Chat panel ─────────────────────────────────────────── -->
-      <section id="chat-panel" class="panel chat-panel hidden" aria-label="Chat">
+      <section id="chat-panel" class="panel chat-panel hidden" aria-label="Chat" data-i18n-aria-label="Chat">
         <header class="panel-head" data-drag-handle="chat">
           <div class="panel-title">
             <span class="avatar-dot"></span>
-            <span id="chat-title">Chat</span>
+            <span id="chat-title" data-i18n="Chat">Chat</span>
           </div>
           <div class="panel-head-actions">
-            <button class="icon-btn" data-action="chat-clear" title="Clear chat">🗑</button>
-            <button class="icon-btn" data-action="chat-settings" title="Chat settings">⚙</button>
-            <button class="icon-btn" data-action="chat-close" title="Close">✕</button>
+            <button class="icon-btn" data-action="chat-clear" title="Clear chat" data-i18n-title="Clear chat">🗑</button>
+            <button class="icon-btn" data-action="chat-settings" title="Chat settings" data-i18n-title="Chat settings">⚙</button>
+            <button class="icon-btn" data-action="chat-close" title="Close" data-i18n-title="Close">✕</button>
           </div>
         </header>
 
@@ -70,8 +76,8 @@
         </div>
 
         <div id="chat-record-hint" class="record-hint hidden">
-          <span class="rec-dot"></span><span id="record-text">Listening…</span>
-          <button class="mini-btn" data-action="record-cancel">Cancel</button>
+          <span class="rec-dot"></span><span id="record-text" data-i18n="Listening…">Listening…</span>
+          <button class="mini-btn" data-action="record-cancel" data-i18n="Cancel">Cancel</button>
         </div>
 
         <footer class="chat-foot">
@@ -80,25 +86,26 @@
             class="chat-input"
             rows="1"
             placeholder="Say something to me…"
+            data-i18n-placeholder="Say something to me…"
           ></textarea>
-          <button id="chat-send" class="send-btn" title="Send">➤</button>
-          <button id="chat-mic" class="mic-btn" title="Voice input">🎤</button>
+          <button id="chat-send" class="send-btn" title="Send" data-i18n-title="Send">➤</button>
+          <button id="chat-mic" class="mic-btn" title="Voice input" data-i18n-title="Voice input">🎤</button>
         </footer>
       </section>
 
       <!-- ── Settings panel (VS Code style) ─────────────────────── -->
-      <section id="settings-panel" class="panel settings-panel hidden" aria-label="Settings">
+      <section id="settings-panel" class="panel settings-panel hidden" aria-label="Settings" data-i18n-aria-label="Settings">
         <header class="vs-titlebar">
-          <span class="vs-title">Settings</span>
+          <span class="vs-title" data-i18n="Settings">Settings</span>
           <div class="vs-title-actions">
-            <button class="icon-btn" data-action="settings-reset" title="Restore default settings">↺</button>
-            <button class="icon-btn" data-action="settings-open-file" title="Open config file">⧉</button>
-            <button class="icon-btn" data-action="settings-close" title="Close">✕</button>
+            <button class="icon-btn" data-action="settings-reset" title="Restore default settings" data-i18n-title="Restore default settings">↺</button>
+            <button class="icon-btn" data-action="settings-open-file" title="Open config file" data-i18n-title="Open config file">⧉</button>
+            <button class="icon-btn" data-action="settings-close" title="Close" data-i18n-title="Close">✕</button>
           </div>
         </header>
 
         <div class="vs-searchbar">
-          <input id="settings-search" type="text" placeholder="Search settings" spellcheck="false" />
+          <input id="settings-search" type="text" placeholder="Search settings" spellcheck="false" data-i18n-placeholder="Search settings" />
         </div>
 
         <div class="vs-main">
@@ -119,6 +126,10 @@
       <div id="toast" class="toast hidden"></div>
 
       <!-- ── Loading overlay ────────────────────────────────────── -->
+      <!--
+        `#loading-text` / `#loading-sub` are NOT marked up for translation: the
+        boot sequence owns them and rewrites them with load progress (main.js).
+      -->
       <div id="loading" class="loading">
         <div class="loading-card">
           <div class="spinner"></div>

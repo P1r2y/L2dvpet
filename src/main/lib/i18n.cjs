@@ -6,7 +6,7 @@
  * rationale. Both processes read the same table file, so a string translated
  * once shows up in the window, the tray menu and the dialogs alike.
  */
-const ZH = require('../shared/i18n.zh.json')
+const ZH = require('../../shared/i18n.zh.json')
 
 const TABLES = { 'zh-CN': ZH }
 const LANGS = ['auto', 'en', 'zh-CN']

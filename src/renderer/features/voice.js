@@ -7,6 +7,7 @@
  * can drive ParamMouthOpenY from the actual waveform.
  */
 import { bus } from '../core/bus.js'
+import { t } from '../core/i18n.js'
 import { clamp, cleanForSpeech } from '../core/util.js'
 
 const bridge = window.pet
@@ -143,7 +144,7 @@ export class VoiceService {
       result = await bridge.tts.speak({ text: clean, provider: opts.provider })
     } catch (err) {
       if (req !== this._speakReq) return false
-      bus.emit('voice:error', { message: `Speech synthesis failed: ${err.message}` })
+      bus.emit('voice:error', { message: t('Speech synthesis failed: {error}', { error: err.message }) })
       return false
     }
     if (req !== this._speakReq) return false // superseded while synthesizing
@@ -151,7 +152,7 @@ export class VoiceService {
     if (!result || result.kind === 'none') return false
 
     if (result.kind === 'error') {
-      bus.emit('voice:error', { message: result.message || 'No speech engine is available' })
+      bus.emit('voice:error', { message: result.message || t('No speech engine is available') })
       bus.emit('voice:all-failed', { message: result.message })
       return false
     }
@@ -161,12 +162,15 @@ export class VoiceService {
     if (result.fellBack) {
       const names = {
         gptsovits: 'GPT-SoVITS',
-        openai: 'Online TTS',
+        openai: t('Online TTS'),
       }
       bus.emit('voice:fallback', {
         from: result.requested,
         to: result.provider,
-        label: `${names[result.requested] || result.requested} unavailable — switched to ${names[result.provider] || result.provider}`,
+        label: t('{from} unavailable — switched to {to}', {
+          from: names[result.requested] || result.requested,
+          to: names[result.provider] || result.provider,
+        }),
       })
     }
     if (result.languageMismatch && !this._warnedLangMismatch[result.lang]) {
@@ -238,7 +242,7 @@ export class VoiceService {
     } catch (err) {
       if (gen !== this._playGen) return false
       this.debug.lastError = String(err?.message || err)
-      bus.emit('voice:error', { message: `Playback failed: ${err.message}` })
+      bus.emit('voice:error', { message: t('Playback failed: {error}', { error: err.message }) })
       this._setSpeaking(false)
       this._active = null
       return false
@@ -405,7 +409,7 @@ export class VoiceService {
   async startRecording() {
     if (this.recording) return true
     if (!this.canRecord) {
-      bus.emit('stt:error', { message: 'Recording is not supported in this environment' })
+      bus.emit('stt:error', { message: t('Recording is not supported in this environment') })
       return false
     }
     const maxSec = clamp(Number(this.getSettings()?.voice?.sttMaxSeconds) || 30, 3, 300)
@@ -416,7 +420,7 @@ export class VoiceService {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       })
     } catch (err) {
-      bus.emit('stt:error', { message: `Cannot access the microphone: ${err.message}` })
+      bus.emit('stt:error', { message: t('Cannot access the microphone: {error}', { error: err.message }) })
       return false
     }
 
@@ -437,7 +441,8 @@ export class VoiceService {
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size) this.chunks.push(e.data)
     }
-    rec.onerror = (e) => bus.emit('stt:error', { message: `Recording error: ${e.error?.name || 'unknown'}` })
+    rec.onerror = (e) =>
+      bus.emit('stt:error', { message: t('Recording error: {error}', { error: e.error?.name || 'unknown' }) })
 
     rec.start(250)
     this.recording = true
@@ -544,7 +549,7 @@ export class VoiceService {
 
     if (cancel || !blob || blob.size < 1200) {
       bus.emit('stt:state', { state: 'idle' })
-      if (!cancel && auto) bus.emit('stt:error', { message: 'No audio was recorded' })
+      if (!cancel && auto) bus.emit('stt:error', { message: t('No audio was recorded') })
       return null
     }
 
@@ -559,7 +564,7 @@ export class VoiceService {
 
     bus.emit('stt:state', { state: 'idle' })
     if (!res || !res.ok) {
-      bus.emit('stt:error', { message: res?.message || 'Speech recognition failed' })
+      bus.emit('stt:error', { message: res?.message || t('Speech recognition failed') })
       return null
     }
     bus.emit('stt:result', { text: res.text })

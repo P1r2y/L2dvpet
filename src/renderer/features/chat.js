@@ -7,6 +7,7 @@
  * streaming in.
  */
 import { bus } from '../core/bus.js'
+import { t } from '../core/i18n.js'
 import { normalizeEmotion } from '../live2d/emotion.js'
 import { debounce, truncate } from '../core/util.js'
 
@@ -156,13 +157,13 @@ export class ChatService {
   async send(userText, { silent = false } = {}) {
     const s = this.getSettings()
     if (!s?.chat?.enabled) {
-      bus.emit('chat:error', { message: 'Chat is turned off in Settings' })
+      bus.emit('chat:error', { message: t('Chat is turned off in Settings') })
       return null
     }
     const cfg = s.chat
     if (!cfg.apiKey) {
       bus.emit('chat:error', {
-        message: 'No API Key yet — open Settings → Chat, fill one in, and the chat works',
+        message: t('No API Key yet — open Settings → Chat, fill one in, and the chat works'),
       })
       return null
     }

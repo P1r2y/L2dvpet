@@ -38,6 +38,7 @@ const gptsovits = require('./lib/gptsovits.cjs')
 const scanGsv = require('./lib/gptsovits-scan.cjs')
 const gsvService = require('./lib/gptsovits-service.cjs')
 const voiceProfile = require('./lib/voice-profile.cjs')
+const i18n = require('./lib/i18n.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
 /** Only files under these roots may be served through app://. */
@@ -135,7 +136,7 @@ function createWindow() {
     hasShadow: false,
     show: false,
     backgroundColor: '#00000000',
-    title: 'AI Desktop Pet',
+    title: i18n.t('AI Desktop Pet'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -259,6 +260,18 @@ function startWatchdog() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Interface language
+ * ------------------------------------------------------------------ */
+/**
+ * Re-resolves the interface language from `ui.language` (`auto` follows the OS
+ * locale). Called once at startup and again on every tray rebuild, so the tray
+ * menu, the tooltips and the hotkey messages all follow the setting.
+ */
+function applyLang() {
+  i18n.setLang(settings.get().ui && settings.get().ui.language, app.getLocale())
+}
+
+/* ------------------------------------------------------------------ *
  * Tray
  * ------------------------------------------------------------------ */
 function trayImage() {
@@ -274,13 +287,13 @@ function buildTrayMenu() {
   const s = settings.get()
   const visible = !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()
   return Menu.buildFromTemplate([
-    { label: 'Show / hide pet', accelerator: 'CommandOrControl+Shift+H', click: () => toggleVisibility() },
+    { label: i18n.t('Show / hide pet'), accelerator: 'CommandOrControl+Shift+H', click: () => toggleVisibility() },
     { type: 'separator' },
-    { label: 'Open chat', accelerator: 'CommandOrControl+Shift+C', click: () => showAndSend({ type: 'open-chat' }) },
-    { label: 'Settings…', accelerator: 'CommandOrControl+Shift+S', click: () => showAndSend({ type: 'open-settings' }) },
+    { label: i18n.t('Open chat'), accelerator: 'CommandOrControl+Shift+C', click: () => showAndSend({ type: 'open-chat' }) },
+    { label: i18n.t('Settings…'), accelerator: 'CommandOrControl+Shift+S', click: () => showAndSend({ type: 'open-settings' }) },
     { type: 'separator' },
     {
-      label: 'Click-through (clicks pass through the pet)',
+      label: i18n.t('Click-through (clicks pass through the pet)'),
       type: 'checkbox',
       checked: !currentlyInteractive,
       click: (item) => {
@@ -291,7 +304,7 @@ function buildTrayMenu() {
       },
     },
     {
-      label: 'Always on top',
+      label: i18n.t('Always on top'),
       type: 'checkbox',
       checked: !!s.display.alwaysOnTop,
       click: (item) => {
@@ -300,7 +313,7 @@ function buildTrayMenu() {
       },
     },
     {
-      label: 'Speak replies',
+      label: i18n.t('Speak replies'),
       type: 'checkbox',
       checked: !!s.voice.ttsEnabled,
       click: (item) => {
@@ -309,12 +322,12 @@ function buildTrayMenu() {
       },
     },
     { type: 'separator' },
-    { label: 'Reset position', click: () => sendToRenderer({ type: 'reset-position' }) },
-    { label: 'Reload', click: () => mainWindow && mainWindow.webContents.reload() },
-    { label: 'Developer tools', click: () => mainWindow && mainWindow.webContents.openDevTools({ mode: 'detach' }) },
+    { label: i18n.t('Reset position'), click: () => sendToRenderer({ type: 'reset-position' }) },
+    { label: i18n.t('Reload'), click: () => mainWindow && mainWindow.webContents.reload() },
+    { label: i18n.t('Developer tools'), click: () => mainWindow && mainWindow.webContents.openDevTools({ mode: 'detach' }) },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: i18n.t('Quit'),
       click: () => {
         quitting = true
         app.quit()
@@ -327,9 +340,12 @@ let manualClickThrough = false
 let quitting = false
 
 function refreshTray() {
+  // Rebuilt from scratch every time, so the language is re-resolved here too:
+  // switching it in the settings panel updates the tray without a restart.
+  applyLang()
   if (!tray) return
   tray.setContextMenu(buildTrayMenu())
-  tray.setToolTip('AI Desktop Pet')
+  tray.setToolTip(i18n.t('AI Desktop Pet'))
 }
 
 function createTray() {
@@ -466,7 +482,7 @@ function registerIpc() {
     root: ROOT,
     displays: screen.getAllDisplays().map((d, i) => ({
       index: i,
-      label: d.label || `Display ${i + 1}`,
+      label: d.label || i18n.t('Display {n}', { n: i + 1 }),
       bounds: d.bounds,
       primary: d.id === screen.getPrimaryDisplay().id,
     })),
@@ -516,7 +532,7 @@ function registerIpc() {
         if (!event.sender.isDestroyed()) {
           event.sender.send('llm:error', {
             id,
-            message: aborted ? 'Request cancelled or timed out' : String(err?.message || err),
+            message: aborted ? i18n.t('Request cancelled or timed out') : String(err?.message || err),
             aborted,
           })
         }
@@ -734,9 +750,9 @@ function registerSttHotkey(accelerator) {
       sttHotkeyRegistered = acc
       return { ok: true, accelerator: acc }
     }
-    return { ok: false, message: `Shortcut ${acc} is already taken by another program` }
+    return { ok: false, message: i18n.t('Shortcut {acc} is already taken by another program', { acc }) }
   } catch (err) {
-    return { ok: false, message: `Invalid shortcut: ${err.message}` }
+    return { ok: false, message: i18n.t('Invalid shortcut: {error}', { error: err.message }) }
   }
 }
 
@@ -1688,6 +1704,10 @@ if (!gotLock) {
     // Materialise both files on first run so users can find and hand-edit them.
     if (!fs.existsSync(settings.filePath)) settings.flush()
     if (!fs.existsSync(state.filePath)) state.flush()
+
+    // Resolve the interface language before the first window, menu or dialog
+    // exists, so the app comes up in the language the user picked.
+    applyLang()
 
     protocol.handle('app', async (request) => {
       const url = new URL(request.url)

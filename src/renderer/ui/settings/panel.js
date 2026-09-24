@@ -275,13 +275,13 @@ export class SettingsPanel {
     // `locks` has replace semantics in the store, so an empty object clears it.
     await this.patch({ locks })
     this.render()
-    toastOk(locks[path] ? `Locked ${path}` : `Unlocked ${path}`, 1600)
+    toastOk(locks[path] ? t('Locked {path}', { path }) : t('Unlocked {path}', { path }), 1600)
   }
 
   async _unlockAll() {
     await this.patch({ locks: {} })
     this.render()
-    toastOk('All settings unlocked')
+    toastOk(t('All settings unlocked'))
   }
 
   /* ---------------------------------------------------------------- *
@@ -424,8 +424,8 @@ export class SettingsPanel {
     const blocks = this._visibleGroups()
 
     if (!blocks.length) {
-      this.body.appendChild(el('div', { class: 'vs-empty', text: 'No matching settings' }))
-      this.countEl.textContent = '0 items'
+      this.body.appendChild(el('div', { class: 'vs-empty', text: t('No matching settings') }))
+      this.countEl.textContent = t('0 items')
       return
     }
 
@@ -461,7 +461,7 @@ export class SettingsPanel {
       }
     }
     if (this.sectionId !== 'params') this.setTrace?.(false)
-    this.countEl.textContent = `${count} items`
+    this.countEl.textContent = t('{count} items', { count })
     this.body.scrollTop = keep
   }
 
@@ -480,7 +480,7 @@ export class SettingsPanel {
   _renderField(f) {
     if (f.type === 'about') return this._renderAbout()
     if (f.type === 'result') return el('div', { class: 'vs-result', id: f.id })
-    if (f.type === 'info') return el('div', { class: 'vs-info', id: f.id, text: f.text, html: f.html })
+    if (f.type === 'info') return el('div', { class: 'vs-info', id: f.id, text: f.text ? t(f.text) : undefined, html: f.html ? t(f.html) : undefined })
     if (f.type === 'buttons') {
       const box = el('div', { class: 'vs-buttons', id: f.id })
       for (const b of f.items) box.appendChild(el('button', { class: 'vs-btn', text: t(b.label), dataset: { cmd: b.id } }))
@@ -513,7 +513,7 @@ export class SettingsPanel {
         el('button', {
           class: 'vs-lock',
           dataset: { lock: f.key },
-          title: locked ? 'Unlock' : 'Lock (locked settings cannot be edited or overwritten by presets)',
+          title: locked ? t('Unlock') : t('Lock (locked settings cannot be edited or overwritten by presets)'),
           text: locked ? '🔒' : '🔓',
         })
       )
@@ -591,12 +591,12 @@ export class SettingsPanel {
           box.appendChild(
             el('button', {
               class: 'vs-btn',
-              text: 'Show',
+              text: t('Show'),
               onclick: (e) => {
                 const b = e.currentTarget
                 const show = input.type === 'password'
                 input.type = show ? 'text' : 'password'
-                b.textContent = show ? 'Hide' : 'Show'
+                b.textContent = show ? t('Hide') : t('Show')
               },
             })
           )
@@ -646,7 +646,7 @@ export class SettingsPanel {
           select.appendChild(el('option', { value: ov, text: ol, selected: sel }))
         }
         if (!matched && value !== undefined && value !== null && String(value) !== '') {
-          select.appendChild(el('option', { value, text: `${value} (current)`, selected: true }))
+          select.appendChild(el('option', { value, text: t('{value} (current)', { value }), selected: true }))
         }
         select._dynamic = f.dynamic || null
         select._editable = !!f.editable
@@ -683,7 +683,7 @@ export class SettingsPanel {
           box.appendChild(
             el('button', {
               class: `vs-chip${Math.abs(value - Number(o.value)) < 0.001 ? ' active' : ''}`,
-              text: o.label,
+              text: t(o.label),
               disabled: dis,
               onclick: async () => {
                 await this.patch(setPath(f.key, Number(o.value)))
@@ -723,9 +723,9 @@ export class SettingsPanel {
           },
         })
         for (const o of [
-          { value: 'auto', label: 'Auto' },
-          { value: 'offset', label: 'Offset' },
-          { value: 'fixed', label: 'Fixed' },
+          { value: 'auto', label: t('Auto') },
+          { value: 'offset', label: t('Offset') },
+          { value: 'fixed', label: t('Fixed') },
         ]) {
           modeSel.appendChild(el('option', { value: o.value, text: o.label, selected: o.value === mode }))
         }
@@ -750,14 +750,14 @@ export class SettingsPanel {
               },
             })
 
-          box.appendChild(el('span', { class: 'vs-unit', text: 'Min' }))
+          box.appendChild(el('span', { class: 'vs-unit', text: t('Min') }))
           box.appendChild(num('min', r.min))
-          box.appendChild(el('span', { class: 'vs-unit', text: 'Max' }))
+          box.appendChild(el('span', { class: 'vs-unit', text: t('Max') }))
           box.appendChild(num('max', r.max))
 
           const reset = el('button', {
             class: 'vs-chip',
-            text: 'Clear',
+            text: t('Clear'),
             disabled: locked || !hasLimits,
             onclick: async () => {
               await set({ min: null, max: null })
@@ -795,7 +795,7 @@ export class SettingsPanel {
           },
         })
         box.append(slider, out)
-        box.appendChild(el('span', { class: 'vs-unit', text: `Driven by ${f.owner} in auto mode` }))
+        box.appendChild(el('span', { class: 'vs-unit', text: t('Driven by {owner} in auto mode', { owner: f.owner }) }))
         return
       }
 
@@ -808,27 +808,27 @@ export class SettingsPanel {
    * Change handling
    * ---------------------------------------------------------------- */
   _onBodyChange(e, isInput) {
-    const t = e.target
-    const path = t.dataset?.path
+    const target = e.target
+    const path = target.dataset?.path
     if (!path) return
     if (this.isLocked(path)) return
-    const kind = t.dataset.kind
+    const kind = target.dataset.kind
 
     let value
-    if (kind === 'bool') value = t.checked
-    else if (kind === 'number') value = t.value === '' ? 0 : Number(t.value)
-    else if (kind === 'lines') value = t.value.split('\n').map((x) => x.trim()).filter(Boolean)
+    if (kind === 'bool') value = target.checked
+    else if (kind === 'number') value = target.value === '' ? 0 : Number(target.value)
+    else if (kind === 'lines') value = target.value.split('\n').map((x) => x.trim()).filter(Boolean)
     else if (kind === 'select') {
-      if (t.value === '__custom__') {
+      if (target.value === '__custom__') {
         const cur = String(getPath(this.getSettings(), path) || '')
-        const next = window.prompt('Custom value', cur) || cur
-        t.value = next
+        const next = window.prompt(t('Custom value'), cur) || cur
+        target.value = next
         value = next
-      } else value = t.value
-    } else value = t.value
+      } else value = target.value
+    } else value = target.value
 
     if (kind === 'number' && !Number.isFinite(value)) return
-    if (t._field && t._out) t._out.textContent = `${fmtValue(t._field, Number(value))}${t._field.unit || ''}`
+    if (target._field && target._out) target._out.textContent = `${fmtValue(target._field, Number(value))}${target._field.unit || ''}`
 
     this.patch(setPath(path, value))
 
@@ -885,7 +885,7 @@ export class SettingsPanel {
       case 'reset-tts':
         this.voice.clearFailure()
         await this._refreshTtsStatus()
-        toastOk('Fallback history cleared')
+        toastOk(t('Fallback history cleared'))
         break
       case 'apply-hotkey':
         await this._withBusy(btn, () => this._applyHotkey())
@@ -940,7 +940,9 @@ export class SettingsPanel {
     this.render()
     this._result(
       'preset-result',
-      `Applied "${preset.label}"${skipped ? ' (some settings are locked and were not overwritten)' : ''}`,
+      skipped
+        ? t('Applied "{name}" (some settings are locked and were not overwritten)', { name: preset.label })
+        : t('Applied "{name}"', { name: preset.label }),
       'ok'
     )
 
@@ -951,7 +953,7 @@ export class SettingsPanel {
       if (st && !st.gptsovitsAvailable) {
         this._result(
           'preset-result',
-          `Applied "${preset.label}", but no GPT-SoVITS service was detected — no sound for now`,
+          t('Applied "{name}", but no GPT-SoVITS service was detected — no sound for now', { name: preset.label }),
           'err'
         )
       }
@@ -1033,7 +1035,7 @@ export class SettingsPanel {
           select.appendChild(
             el('option', {
               value: d.index,
-              text: `${d.label} ${d.bounds.width}×${d.bounds.height}${d.primary ? ' (primary)' : ''}`,
+              text: `${d.label} ${d.bounds.width}×${d.bounds.height}${d.primary ? t(' (primary)') : ''}`,
               selected: d.index === cur,
             })
           )
@@ -1052,7 +1054,7 @@ export class SettingsPanel {
         continue
       }
 
-      select.appendChild(el('option', { value: '', text: 'Default' }))
+      select.appendChild(el('option', { value: '', text: t('Default') }))
 
       const two = src.lang ? src.lang.slice(0, 2).toLowerCase() : null
       const matching = two ? voices.filter((v) => String(v.locale || '').toLowerCase().startsWith(two)) : []
@@ -1071,13 +1073,13 @@ export class SettingsPanel {
         select.appendChild(og)
       }
       if (others.length) {
-        const og = el('optgroup', { label: `Others (${others.length})` })
+        const og = el('optgroup', { label: t('Others ({count})', { count: others.length }) })
         add(others, og)
         select.appendChild(og)
       }
       const has = Array.from(select.options).some((o) => o.value === String(current ?? ''))
       if (!has && current !== undefined && current !== null && String(current) !== '') {
-        select.appendChild(el('option', { value: String(current), text: `${current} (current)`, selected: true }))
+        select.appendChild(el('option', { value: String(current), text: t('{value} (current)', { value: current }), selected: true }))
       }
     }
 
@@ -1101,30 +1103,32 @@ export class SettingsPanel {
     this._lastSpokenLanguage = st.lastSpokenLanguage || this._lastSpokenLanguage
     const labels = {
       gptsovits: 'GPT-SoVITS',
-      openai: 'Online TTS',
+      openai: t('Online TTS'),
     }
     const parts = (st.engines || []).map((e) => {
       const name = labels[e.provider] || e.provider
-      if (e.cooling) return `${name} · cooling down ${e.retryInMin} min`
-      if (e.provider === 'openai' && !st.hasOpenaiKey) return `${name} · no API key`
-      if (e.provider === 'gptsovits' && !st.gptsovitsAvailable) return `${name} · not running`
-      return `${name} · ready`
+      if (e.cooling) return t('{name} · cooling down {min} min', { name, min: e.retryInMin })
+      if (e.provider === 'openai' && !st.hasOpenaiKey) return t('{name} · no API key', { name })
+      if (e.provider === 'gptsovits' && !st.gptsovitsAvailable) return t('{name} · not running', { name })
+      return t('{name} · ready', { name })
     })
     node.className = 'vs-result'
     node.textContent = parts.join('　')
-    if (verbose) toastOk('Engine status refreshed')
+    if (verbose) toastOk(t('Engine status refreshed'))
   }
 
   _refreshLangStatus() {
     const node = document.getElementById('lang-status')
     if (!node) return
     const s = this.getSettings()
-    const labels = { 'zh-CN': 'Chinese', 'ja-JP': 'Japanese', 'en-US': 'English', 'ko-KR': 'Korean' }
+    const labels = { 'zh-CN': t('Chinese'), 'ja-JP': t('Japanese'), 'en-US': t('English'), 'ko-KR': t('Korean') }
     const mode = s.voice?.languageMode || 'auto'
-    const t = mode === 'auto' ? 'Auto-detect' : labels[mode] || mode
-    const last = this._lastSpokenLanguage ? ` · Last: ${labels[this._lastSpokenLanguage] || this._lastSpokenLanguage}` : ''
+    const modeLabel = mode === 'auto' ? t('Auto-detect') : labels[mode] || mode
+    const last = this._lastSpokenLanguage
+      ? t(' · Last: {lang}', { lang: labels[this._lastSpokenLanguage] || this._lastSpokenLanguage })
+      : ''
     node.className = 'vs-result'
-    node.textContent = `Mode: ${t}${last}`
+    node.textContent = t('Mode: {mode}{last}', { mode: modeLabel, last })
   }
 
   _refreshRigRanges() {
@@ -1133,7 +1137,7 @@ export class SettingsPanel {
       const keys = Object.keys(ranges)
       if (!keys.length) {
         node.className = 'vs-result'
-        node.textContent = 'Parameter ranges not loaded yet'
+        node.textContent = t('Parameter ranges not loaded yet')
         continue
       }
       node.className = 'vs-result'
@@ -1146,7 +1150,7 @@ export class SettingsPanel {
     if (!node) return
     const locks = Object.keys(this.locks())
     node.className = 'vs-result'
-    node.textContent = locks.length ? locks.join('\n') : '(No locked settings)'
+    node.textContent = locks.length ? locks.join('\n') : t('(No locked settings)')
     node.style.whiteSpace = 'pre-wrap'
   }
 
@@ -1154,7 +1158,7 @@ export class SettingsPanel {
    * Actions
    * ---------------------------------------------------------------- */
   async _testLlm() {
-    this._result('llm-result', 'Connecting…')
+    this._result('llm-result', t('Connecting…'))
     const s = this.getSettings()
     const res = await window.pet.llm.test({
       config: {
@@ -1166,16 +1170,16 @@ export class SettingsPanel {
         timeoutMs: 30000,
       },
     })
-    if (res.ok) this._result('llm-result', `Connected: ${res.reply || '(empty)'}`, 'ok')
+    if (res.ok) this._result('llm-result', t('Connected: {reply}', { reply: res.reply || t('(empty)') }), 'ok')
     else this._result('llm-result', res.message, 'err')
   }
 
   async _listModels() {
-    this._result('llm-result', 'Fetching…')
+    this._result('llm-result', t('Fetching…'))
     const s = this.getSettings()
     const res = await window.pet.llm.models({ config: { baseUrl: s.chat.baseUrl, apiKey: s.chat.apiKey } })
     if (!res.ok) return this._result('llm-result', res.message, 'err')
-    if (!res.models.length) return this._result('llm-result', 'The API returned no models', 'err')
+    if (!res.models.length) return this._result('llm-result', t('The API returned no models'), 'err')
     const input = this.body.querySelector('input[data-path="chat.model"]')
     if (input) {
       let dl = document.getElementById('model-datalist')
@@ -1187,11 +1191,11 @@ export class SettingsPanel {
       dl.textContent = ''
       for (const m of res.models.slice(0, 500)) dl.appendChild(el('option', { value: m }))
     }
-    this._result('llm-result', `Found ${res.models.length} models — pick one from the dropdown`, 'ok')
+    this._result('llm-result', t('Found {n} models — pick one from the dropdown', { n: res.models.length }), 'ok')
   }
 
   async _testTts(btn) {
-    this._result('tts-result', 'Synthesizing…')
+    this._result('tts-result', t('Synthesizing…'))
     // Speak a sentence in the configured language: the demo text's language is
     // what picks the voice, so an English sentence would audition the English
     // voice even when the pet is set to Japanese or Chinese.
@@ -1200,7 +1204,13 @@ export class SettingsPanel {
     const d = this.voice.debug
     this._result(
       'tts-result',
-      ok ? `${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s · level ${d.maxLevel.toFixed(2)}` : 'Synthesis or playback failed',
+      ok
+        ? t('{provider} · {duration}s · level {level}', {
+            provider: d.provider || '?',
+            duration: d.duration ? d.duration.toFixed(1) : '?',
+            level: d.maxLevel.toFixed(2),
+          })
+        : t('Synthesis or playback failed'),
       ok ? 'ok' : 'err'
     )
     await this._refreshTtsStatus()
@@ -1208,14 +1218,16 @@ export class SettingsPanel {
 
   async _testTtsLang(lang, text) {
     const mode = this.getSettings().voice.languageMode
-    this._result('tts-result', `Synthesizing ${lang}…`)
+    this._result('tts-result', t('Synthesizing {lang}…', { lang }))
     try {
       await this.patch({ voice: { languageMode: lang } })
       const ok = await this.voice.speak(text, { force: true })
       const d = this.voice.debug
       this._result(
         'tts-result',
-        ok ? `${lang} · ${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s` : `${lang} synthesis failed`,
+        ok
+          ? `${lang} · ${d.provider || '?'} · ${d.duration ? d.duration.toFixed(1) : '?'}s`
+          : t('{lang} synthesis failed', { lang }),
         ok ? 'ok' : 'err'
       )
     } finally {
@@ -1227,7 +1239,11 @@ export class SettingsPanel {
   async _applyHotkey() {
     const acc = this.getSettings().voice.sttHotkey
     const res = await window.pet.app.registerHotkey(acc)
-    this._result('stt-result', res.ok ? (res.accelerator ? `Registered ${res.accelerator}` : 'Hotkey cleared') : res.message, res.ok ? 'ok' : 'err')
+    this._result(
+      'stt-result',
+      res.ok ? (res.accelerator ? t('Registered {key}', { key: res.accelerator }) : t('Hotkey cleared')) : res.message,
+      res.ok ? 'ok' : 'err'
+    )
   }
 
   /** Finds a GPT-SoVITS install and fills in every path it can. */
@@ -1237,7 +1253,9 @@ export class SettingsPanel {
     if (!scan?.root) {
       this._result(
         'gsv-result',
-        `GPT-SoVITS not found. Set "Install folder" to the folder that contains api_v2.py.\nSearched: ${(scan?.searched || []).join(', ')}`,
+        t('GPT-SoVITS not found. Set "Install folder" to the folder that contains api_v2.py.\nSearched: {searched}', {
+          searched: (scan?.searched || []).join(', '),
+        }),
         'err'
       )
       return
@@ -1259,19 +1277,19 @@ export class SettingsPanel {
       g.mode = 'weights'
       g.gptWeights = scan.gptWeights[0].path
       g.sovitsWeights = scan.sovitsWeights[0].path
-      notes.push(`Fine-tuned model: ${scan.gptWeights[0].name} + ${scan.sovitsWeights[0].name}`)
+      notes.push(t('Fine-tuned model: {a} + {b}', { a: scan.gptWeights[0].name, b: scan.sovitsWeights[0].name }))
     } else if (scan.pretrained.gpt && scan.pretrained.sovits) {
       // Base models can only do zero-shot, so a reference clip is required.
       g.mode = scan.references.length ? 'audio' : 'weights'
       g.gptWeights = scan.pretrained.gpt
       g.sovitsWeights = scan.pretrained.sovits
-      notes.push('No fine-tuned model found; using the bundled base model')
+      notes.push(t('No fine-tuned model found; using the bundled base model'))
     }
 
     if (scan.references.length) {
       const ref = scan.references[0]
       g.refAudio = ref.path
-      notes.push(`Reference audio: ${ref.name}`)
+      notes.push(t('Reference audio: {name}', { name: ref.name }))
       if (ref.transcript) {
         g.promptText = ref.transcript
         // Guess the prompt language from the transcript's script.
@@ -1282,13 +1300,13 @@ export class SettingsPanel {
             : /[\u4e00-\u9fff]/.test(ref.transcript)
               ? 'zh'
               : 'en'
-        notes.push(`Reference text: ${ref.transcript.slice(0, 24)}${ref.transcript.length > 24 ? '…' : ''}`)
+        notes.push(t('Reference text: {text}', { text: `${ref.transcript.slice(0, 24)}${ref.transcript.length > 24 ? '…' : ''}` }))
       } else {
-        notes.push('⚠ No matching .txt transcript for this audio — fill in "Reference audio text" manually')
+        notes.push(t('⚠ No matching .txt transcript for this audio — fill in "Reference audio text" manually'))
       }
     } else if (g.mode === 'audio') {
       g.mode = 'weights'
-      notes.push('No reference audio found; switched to Persistent model mode')
+      notes.push(t('No reference audio found; switched to Persistent model mode'))
     }
 
     await this.patch(patch)
@@ -1296,42 +1314,49 @@ export class SettingsPanel {
 
     const probe = await window.pet.tts.status().catch(() => null)
     const running = probe?.gptsovitsAvailable
-    this._result(
-      'gsv-result',
-      `Install folder: ${scan.root}\n${notes.join('\n')}\nService: ${running ? 'running ✅' : 'not running ❌ (click "Start now" or run start-gptsovits-api.ps1)'}`,
-      running ? 'ok' : 'err'
-    )
-    toastOk('GPT-SoVITS settings detected and filled in')
+    const lines = [
+      t('Install folder: {path}', { path: scan.root }),
+      ...notes,
+      t('Service: {state}', {
+        state: running ? t('running ✅') : t('not running ❌ (click "Start now" or run start-gptsovits-api.ps1)'),
+      }),
+    ]
+    this._result('gsv-result', lines.join('\n'), running ? 'ok' : 'err')
+    toastOk(t('GPT-SoVITS settings detected and filled in'))
   }
 
   /** Starts GPT-SoVITS through the main process (it owns the child process). */
   async _startGptsovits() {
     const st = this.getSettings()
-    this._result('gsv-result', 'Starting GPT-SoVITS… (loading the weights takes about 20–60 seconds the first time)', 'ok')
+    this._result('gsv-result', t('Starting GPT-SoVITS… (loading the weights takes about 20–60 seconds the first time)'), 'ok')
     const res = await window.pet.tts.ensureGptsovits()
     const status = await window.pet.tts.gptsovitsStatus().catch(() => null)
     const lines = [res.message]
     if (status) {
-      lines.push(`Install folder: ${status.root || '(not set)'}`)
-      lines.push(`Service: ${status.running ? `running at ${status.host}:${status.port}` : 'not running'}`)
+      lines.push(t('Install folder: {path}', { path: status.root || t('(not set)') }))
+      lines.push(
+        t('Service: {state}', {
+          state: status.running ? t('running at {host}:{port}', { host: status.host, port: status.port }) : t('not running'),
+        })
+      )
     }
     if (!res.ok) this._result('gsv-result', lines.join('\n'), 'err')
     else this._result('gsv-result', lines.join('\n'), 'ok')
   }
 
   async _reset() {
-    if (!window.confirm('Restore all settings to their defaults? Locked settings are reset too.')) return
+    if (!window.confirm(t('Restore all settings to their defaults? Locked settings are reset too.'))) return
     await window.pet.settings.reset()
     bus.emit('settings:reloaded')
     this.render()
-    toastOk('Settings restored to defaults')
+    toastOk(t('Settings restored to defaults'))
   }
 
   _flashSaved() {
     if (!this.statusEl) return
-    this.statusEl.textContent = 'Saved'
+    this.statusEl.textContent = t('Saved')
     setTimeout(() => {
-      if (this.statusEl.textContent === 'Saved') this.statusEl.textContent = ''
+      if (this.statusEl.textContent === t('Saved')) this.statusEl.textContent = ''
     }, 1500)
   }
 
@@ -1346,12 +1371,12 @@ export class SettingsPanel {
     box.appendChild(
       el('div', {
         html:
-          `<div><b>Live2D Desktop Pet</b> v${i.version || '1.0.0'}</div>` +
+          `<div><b>${t('Live2D Desktop Pet')}</b> v${i.version || '1.0.0'}</div>` +
           `<div class="vs-dim">Electron ${i.electron || '?'} · Chromium ${i.chrome || '?'} · Node ${i.node || '?'} · ${i.platform || '-'}</div>` +
-          `<div class="vs-dim">Config: ${i.settingsPath || '-'}</div>` +
-          `<div class="vs-dim">Model: ${modelShort} (generated by psd2live · Cubism 5)</div>` +
-          `<div class="vs-dim">Controls: hold left button = pet · drag right button = move · right click = menu</div>` +
-          `<div class="vs-dim">Shortcuts: Ctrl+Shift+H show/hide · Ctrl+Shift+C chat · Ctrl+Shift+S settings · Esc cancel</div>`,
+          `<div class="vs-dim">${t('Config: {path}', { path: i.settingsPath || '-' })}</div>` +
+          `<div class="vs-dim">${t('Model: {name} (generated by psd2live · Cubism 5)', { name: modelShort })}</div>` +
+          `<div class="vs-dim">${t('Controls: hold left button = pet · drag right button = move · right click = menu')}</div>` +
+          `<div class="vs-dim">${t('Shortcuts: Ctrl+Shift+H show/hide · Ctrl+Shift+C chat · Ctrl+Shift+S settings · Esc cancel')}</div>`,
       })
     )
     const row = el('div', { class: 'vs-buttons' })
@@ -1359,15 +1384,15 @@ export class SettingsPanel {
     window.pet.app.getAutoLaunch().then((on) => (launch.checked = !!on))
     launch.addEventListener('change', async () => {
       const v = await window.pet.app.setAutoLaunch(launch.checked)
-      toastOk(v ? 'Auto-launch enabled' : 'Auto-launch disabled')
+      toastOk(v ? t('Auto-launch enabled') : t('Auto-launch disabled'))
     })
     row.append(
-      el('label', { class: 'vs-check' }, launch, el('span', { text: 'Launch at login' })),
-      el('button', { class: 'vs-btn', text: 'Config file', onclick: () => window.pet.settings.openFile() }),
-      el('button', { class: 'vs-btn', text: 'Developer tools', onclick: () => window.pet.win.devtools() }),
-      el('button', { class: 'vs-btn', text: 'Reload UI', onclick: () => window.pet.win.reload() }),
-      el('button', { class: 'vs-btn', text: 'Hide pet', onclick: () => window.pet.win.hide() }),
-      el('button', { class: 'vs-btn danger', text: 'Quit', onclick: () => window.pet.win.quit() })
+      el('label', { class: 'vs-check' }, launch, el('span', { text: t('Launch at login') })),
+      el('button', { class: 'vs-btn', text: t('Config file'), onclick: () => window.pet.settings.openFile() }),
+      el('button', { class: 'vs-btn', text: t('Developer tools'), onclick: () => window.pet.win.devtools() }),
+      el('button', { class: 'vs-btn', text: t('Reload UI'), onclick: () => window.pet.win.reload() }),
+      el('button', { class: 'vs-btn', text: t('Hide pet'), onclick: () => window.pet.win.hide() }),
+      el('button', { class: 'vs-btn danger', text: t('Quit'), onclick: () => window.pet.win.quit() })
     )
     box.appendChild(row)
     return box

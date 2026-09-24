@@ -4,7 +4,38 @@
  */
 import { $, clamp, el, formatClock, truncate } from '../core/util.js'
 import { bus } from '../core/bus.js'
+import { getLang, t } from '../core/i18n.js'
 import { toastErr } from './notify.js'
+
+/**
+ * Re-labels the static markup in `index.html` (window title, tooltips,
+ * `aria-label`s, placeholders, the chat/settings title bars and the dock).
+ *
+ * The markup itself stays English-only — the English string IS the i18n key —
+ * and every translatable element opts in with an attribute saying which part of
+ * it to fill:
+ *
+ *   data-i18n              → textContent
+ *   data-i18n-title        → title (tooltip)
+ *   data-i18n-aria-label   → aria-label
+ *   data-i18n-placeholder  → placeholder
+ *
+ * Runs at startup and again on every `i18n:changed`, so it is idempotent.
+ * `#loading-text` / `#loading-sub` are deliberately skipped: the boot sequence
+ * owns them and rewrites them with load progress.
+ */
+export function applyStaticI18n(root = document) {
+  for (const node of root.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n)
+  for (const node of root.querySelectorAll('[data-i18n-title]')) node.title = t(node.dataset.i18nTitle)
+  for (const node of root.querySelectorAll('[data-i18n-aria-label]')) {
+    node.setAttribute('aria-label', t(node.dataset.i18nAriaLabel))
+  }
+  for (const node of root.querySelectorAll('[data-i18n-placeholder]')) {
+    node.placeholder = t(node.dataset.i18nPlaceholder)
+  }
+  // Screen readers should read the Chinese UI with a Chinese voice.
+  document.documentElement.lang = getLang()
+}
 
 export class ChatPanel {
   constructor({ pet, chat, voice, getSettings, onStateChange }) {
@@ -33,6 +64,13 @@ export class ChatPanel {
     this._wire()
     this._wireBus()
     this._autosize()
+
+    // The static markup is translated from here (this runs before the boot
+    // sequence applies the language setting, so the `i18n:changed` listener
+    // below picks up the first real language and every later switch), and the
+    // runtime strings this panel writes itself go through `t()` at the source.
+    applyStaticI18n()
+    bus.on('i18n:changed', () => applyStaticI18n())
   }
 
   _wire() {
@@ -44,7 +82,7 @@ export class ChatPanel {
       else if (a === 'chat-clear') {
         this.chat.clear()
         this.clear()
-        this.addMessage('system', 'Chat history cleared')
+        this.addMessage('system', t('Chat history cleared'))
       } else if (a === 'chat-settings') bus.emit('ui:open-settings', { tab: 'chat' })
       else if (a === 'record-cancel') this.voice.stopRecording({ cancel: true })
     })
@@ -125,10 +163,10 @@ export class ChatPanel {
       if (state === 'recording') {
         this.micBtn.classList.add('recording')
         this.recordHint.classList.remove('hidden')
-        this.recordText.textContent = `Listening… (up to ${maxSeconds || 30}s)`
+        this.recordText.textContent = t('Listening… (up to {n}s)', { n: maxSeconds || 30 })
       } else if (state === 'transcribing') {
         this.micBtn.classList.remove('recording')
-        this.recordText.textContent = 'Transcribing…'
+        this.recordText.textContent = t('Transcribing…')
       } else {
         this.micBtn.classList.remove('recording')
         this.recordHint.classList.add('hidden')
@@ -228,7 +266,7 @@ export class ChatPanel {
       { class: `msg ${role}` },
       role === 'system' || role === 'error'
         ? null
-        : el('div', { class: 'msg-emotion', text: `${role === 'user' ? 'You' : this.personaName()} · ${formatClock()}` }),
+        : el('div', { class: 'msg-emotion', text: `${role === 'user' ? t('You') : this.personaName()} · ${formatClock()}` }),
       el('div', { class: 'msg-body', text: String(text || '') })
     )
     this.log.appendChild(node)
@@ -238,7 +276,7 @@ export class ChatPanel {
   }
 
   personaName() {
-    return this.getSettings()?.chat?.personaName || 'Assistant'
+    return this.getSettings()?.chat?.personaName || t('Assistant')
   }
 
   beginStream() {
@@ -285,7 +323,7 @@ export class ChatPanel {
     this.clear()
     const items = Array.isArray(history) ? history.slice(-30) : []
     if (!items.length) {
-      this.addMessage('system', 'No messages yet — say hi to get started.')
+      this.addMessage('system', t('No messages yet — say hi to get started.'))
       return
     }
     for (const m of items) {
@@ -308,7 +346,7 @@ export class ChatPanel {
 
   async toggleRecord() {
     if (!this.getSettings()?.voice?.sttEnabled) {
-      toastErr('Voice input is disabled in settings')
+      toastErr(t('Voice input is disabled in settings'))
       return
     }
     if (this.voice.recording) await this.voice.stopRecording()

@@ -11,6 +11,7 @@ const net = require('node:net')
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const { t } = require('./i18n.cjs')
 
 /** True when something is already listening on host:port. */
 function portOpen(host, port, timeout = 700) {
@@ -78,7 +79,7 @@ async function ensureRunning(settings, log = () => {}) {
   const { host, port } = parseHostPort(cfg.baseUrl)
 
   if (await portOpen(host, port)) {
-    return { ok: true, started: false, alreadyRunning: true, message: `Service already running on ${host}:${port}` }
+    return { ok: true, started: false, alreadyRunning: true, message: t('Service already running on {host}:{port}', { host, port }) }
   }
 
   const script = launcherFor(cfg.root)
@@ -87,7 +88,7 @@ async function ensureRunning(settings, log = () => {}) {
       ok: false,
       started: false,
       alreadyRunning: false,
-      message: 'api_v2.py not found in the GPT-SoVITS install (Settings → Voice → GPT-SoVITS → auto-detect)',
+      message: t('api_v2.py not found in the GPT-SoVITS install (Settings → Voice → GPT-SoVITS → auto-detect)'),
     }
   }
 
@@ -109,18 +110,18 @@ async function ensureRunning(settings, log = () => {}) {
     })
     child.unref()
   } catch (err) {
-    return { ok: false, started: false, alreadyRunning: false, message: `Failed to start: ${err.message}` }
+    return { ok: false, started: false, alreadyRunning: false, message: t('Failed to start: {error}', { error: err.message }) }
   }
 
   // Wait for the port to come up — v2ProPlus needs a while to load weights.
   const deadline = Date.now() + 180000
   while (Date.now() < deadline) {
     if (await portOpen(host, port, 1000)) {
-      return { ok: true, started: true, alreadyRunning: false, message: `GPT-SoVITS started (${host}:${port})` }
+      return { ok: true, started: true, alreadyRunning: false, message: t('GPT-SoVITS started ({host}:{port})', { host, port }) }
     }
     await new Promise((r) => setTimeout(r, 1500))
   }
-  return { ok: false, started: true, alreadyRunning: false, message: 'Process launched, but the port was still not ready after 180 s' }
+  return { ok: false, started: true, alreadyRunning: false, message: t('Process launched, but the port was still not ready after 180 s') }
 }
 
 module.exports = { ensureRunning, portOpen, launcherFor, parseHostPort }

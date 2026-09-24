@@ -78,7 +78,7 @@ async function boot() {
   }
 
   try {
-    setProgress('Reading settings…')
+    setProgress(t('Reading settings…'))
     const [settings, state, defaults] = await Promise.all([
       bridge.settings.get(),
       bridge.state.get(),
@@ -109,12 +109,15 @@ async function boot() {
       const p = String(settings.model.path || '').trim()
       throw new Error(
         p
-          ? `Failed to load the Live2D model: ${p} (${err?.message || err}). Point Settings → Display → Model path at an existing .model3.json.`
-          : 'No Live2D model is set yet. Fill in the path to your own .model3.json under Settings → Display → Model path.'
+          ? t('Failed to load the Live2D model: {path} ({error}). Point Settings → Display → Model path at an existing .model3.json.', {
+              path: p,
+              error: err?.message || err,
+            })
+          : t('No Live2D model is set yet. Fill in the path to your own .model3.json under Settings → Display → Model path.')
       )
     }
 
-    setProgress('Ready')
+    setProgress(t('Ready'))
     pet.applySettings(app.settings)
 
     /* controllers ---------------------------------------------------- */
@@ -210,7 +213,7 @@ async function boot() {
     // Startup greeting
     if (app.settings.chat.autoGreeting) {
       setTimeout(() => {
-        const greet = app.settings.chat.greeting || 'Hi there~'
+        const greet = app.settings.chat.greeting || t('Hi there~')
         app.bubble.show(greet, { actions: true, duration: 12 })
         app.pet.setEmotion('happy', 4000)
         if (app.settings.voice.ttsEnabled && app.settings.voice.autoSpeak) {
@@ -888,8 +891,8 @@ async function boot() {
     console.error('[app] boot failed', err)
     loading.classList.remove('done')
     loading.querySelector('.loading-card')?.classList.add('error')
-    setProgress('Startup failed', String(err?.message || err))
-    toastErr(`Startup failed: ${err?.message || err}`, 12000)
+    setProgress(t('Startup failed'), String(err?.message || err))
+    toastErr(t('Startup failed: {error}', { error: err?.message || err }), 12000)
   }
 }
 
@@ -942,7 +945,7 @@ function wireDock() {
     await patchSettings({ voice: { ttsEnabled: on } })
     updateDockSpeakIcon()
     if (!on) app.voice.stop()
-    toastOk(on ? 'Voice reading on' : 'Voice reading off')
+    toastOk(on ? t('Voice reading on') : t('Voice reading off'))
   })
 }
 
@@ -1041,15 +1044,15 @@ function wireBus() {
   /* ---- context menu ---- */
   bus.on('input:context-menu', ({ x, y }) => {
     app.menu.show(x, y, [
-      { label: 'Start chatting', icon: '💬', action: () => app.chatPanel.open() },
-      { label: app.settings.voice.sttEnabled ? 'Voice input' : 'Voice input (off)', icon: '🎤', action: () => app.chatPanel.toggleRecord() },
+      { label: t('Start chatting'), icon: '💬', action: () => app.chatPanel.open() },
+      { label: app.settings.voice.sttEnabled ? t('Voice input') : t('Voice input (off)'), icon: '🎤', action: () => app.chatPanel.toggleRecord() },
       { type: 'sep' },
-      { label: 'Make her nod', icon: '🙂', action: () => app.pet.react('nod') },
-      { label: 'Make her shake her head', icon: '🙅', action: () => app.pet.react('shake') },
-      { label: 'Head pat', icon: '💗', action: () => app.pet.react('love') },
+      { label: t('Make her nod'), icon: '🙂', action: () => app.pet.react('nod') },
+      { label: t('Make her shake her head'), icon: '🙅', action: () => app.pet.react('shake') },
+      { label: t('Head pat'), icon: '💗', action: () => app.pet.react('love') },
       { type: 'sep' },
       {
-        label: app.settings.voice.ttsEnabled ? 'Turn voice reading off' : 'Turn voice reading on',
+        label: app.settings.voice.ttsEnabled ? t('Turn voice reading off') : t('Turn voice reading on'),
         icon: '🔊',
         action: async () => {
           await patchSettings({ voice: { ttsEnabled: !app.settings.voice.ttsEnabled } })
@@ -1058,20 +1061,20 @@ function wireBus() {
         },
       },
       {
-        label: 'Click-through',
+        label: t('Click-through'),
         icon: '🖱',
         checked: app.overrideClickThrough,
         action: () => {
           app.overrideClickThrough = !app.overrideClickThrough
           bridge.win.setIgnoreMouse(app.overrideClickThrough)
-          toast(app.overrideClickThrough ? 'Click-through on (restore from the tray)' : 'Mouse interaction restored', '', 4000)
+          toast(app.overrideClickThrough ? t('Click-through on (restore from the tray)') : t('Mouse interaction restored'), '', 4000)
         },
       },
       { type: 'sep' },
-      { label: 'Settings…', icon: '⚙️', key: 'Ctrl+Shift+S', action: () => app.settingsPanel.open() },
-      { label: 'Let her idle (hide)', icon: '👁', key: 'Ctrl+Shift+H', action: () => bridge.win.hide() },
+      { label: t('Settings…'), icon: '⚙️', key: 'Ctrl+Shift+S', action: () => app.settingsPanel.open() },
+      { label: t('Let her idle (hide)'), icon: '👁', key: 'Ctrl+Shift+H', action: () => bridge.win.hide() },
       { type: 'sep' },
-      { label: 'Quit', icon: '🚪', danger: true, action: () => bridge.win.quit() },
+      { label: t('Quit'), icon: '🚪', danger: true, action: () => bridge.win.quit() },
     ])
   })
 
@@ -1083,7 +1086,7 @@ function wireBus() {
 
   bus.on('chat:start', () => {
     app.pet.setEmotion('think', 20000)
-    if (!app.chatPanel.visible) app.bubble.show('Hmm… let me think~', { duration: 0, keep: true })
+    if (!app.chatPanel.visible) app.bubble.show(t('Hmm… let me think~'), { duration: 0, keep: true })
   })
 
   bus.on('chat:delta', ({ full }) => {
@@ -1114,7 +1117,7 @@ function wireBus() {
   })
 
   bus.on('chat:error', () => app.pet.setEmotion('sad', 3500))
-  bus.on('chat:cleared', () => toastOk('Chat history cleared'))
+  bus.on('chat:cleared', () => toastOk(t('Chat history cleared')))
 
   // ChatService mutates its own view of state; mirror it to disk so the
   // conversation (and stats) survive a restart.
@@ -1123,15 +1126,22 @@ function wireBus() {
   /* ---- voice ---- */
   bus.on('voice:error', ({ message }) => toastErr(message, 6000))
   bus.on('voice:fallback', ({ label, from, to }) => {
-    const names = { gptsovits: 'GPT-SoVITS', openai: 'Online TTS' }
-    toast(label || `${names[from] || from} unavailable — switched to ${names[to] || to}`, 'err', 6000)
+    const names = { gptsovits: 'GPT-SoVITS', openai: t('Online TTS') }
+    toast(
+      label || t('{from} unavailable — switched to {to}', { from: names[from] || from, to: names[to] || to }),
+      'err',
+      6000
+    )
     updateDockSpeakIcon()
   })
   bus.on('voice:lang-mismatch', ({ lang }) => {
-    const pretty = { 'ja-JP': 'Japanese', 'en-US': 'English', 'ko-KR': 'Korean', 'zh-CN': 'Chinese' }[lang] || lang
+    const pretty = t({ 'ja-JP': 'Japanese', 'en-US': 'English', 'ko-KR': 'Korean', 'zh-CN': 'Chinese' }[lang] || lang)
     toast(
-      `This machine has no ${pretty} speech engine, so ${pretty} text is read with the current voice (timbre and pronunciation may be off). ` +
-        `For a ${pretty} voice: keep the GPT-SoVITS service running, or point an online TTS endpoint at a model that supports the language.`,
+      t(
+        'This machine has no {lang} speech engine, so {lang} text is read with the current voice (timbre and pronunciation may be off). ' +
+          'For a {lang} voice: keep the GPT-SoVITS service running, or point an online TTS endpoint at a model that supports the language.',
+        { lang: pretty }
+      ),
       'err',
       9000
     )
@@ -1151,7 +1161,7 @@ function wireBus() {
     app.dock?.setEnabled(app.settings?.ui?.dockVisible !== false)
     applyTheme()
     updateDockSpeakIcon()
-    toastOk('Defaults restored')
+    toastOk(t('Defaults restored'))
   })
 
   /* ---- internal UI commands ---- */
@@ -1175,10 +1185,10 @@ function wireBus() {
     const g = app.pet.gaze.output
     app.statusEl.textContent =
       `FPS ${String(app.pet.fps).padStart(3)}  ${app.settings.display.fps}cap\n` +
-      `Emotion ${app.pet.emotion.current}\n` +
-      `Eyes ${g.eyeX >= 0 ? '+' : ''}${g.eyeX.toFixed(2)} ${g.eyeY >= 0 ? '+' : ''}${g.eyeY.toFixed(2)}\n` +
-      `Head ${g.headX >= 0 ? '+' : ''}${g.headX.toFixed(1)}° ${g.headY >= 0 ? '+' : ''}${g.headY.toFixed(1)}°\n` +
-      `Interaction ${app.interaction.overModel ? 'petting' : app.interaction.overUI ? 'UI' : 'click-through'}`
+      `${t('Emotion')} ${app.pet.emotion.current}\n` +
+      `${t('Eyes')} ${g.eyeX >= 0 ? '+' : ''}${g.eyeX.toFixed(2)} ${g.eyeY >= 0 ? '+' : ''}${g.eyeY.toFixed(2)}\n` +
+      `${t('Head')} ${g.headX >= 0 ? '+' : ''}${g.headX.toFixed(1)}° ${g.headY >= 0 ? '+' : ''}${g.headY.toFixed(1)}°\n` +
+      `${t('Interaction')} ${app.interaction.overModel ? t('petting') : app.interaction.overUI ? 'UI' : t('click-through')}`
   }, 250)
 
   /* ---- periodic HUD tracking ---- */
@@ -1218,7 +1228,7 @@ function wireMainCommands() {
         break
       case 'click-through-override':
         app.overrideClickThrough = !!cmd.value
-        toast(cmd.value ? 'Click-through on — clicks pass through the pet' : 'Mouse interaction restored', '', 3500)
+        toast(cmd.value ? t('Click-through on — clicks pass through the pet') : t('Mouse interaction restored'), '', 3500)
         break
       case 'settings-changed-externally':
         app.settings = cmd.settings
